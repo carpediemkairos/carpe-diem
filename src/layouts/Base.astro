@@ -975,6 +975,22 @@ import { ViewTransitions } from 'astro:transitions';
         transition-duration: 0.01ms !important;
       }
     }
+
+    /* ---- Critical Tailwind utilities (LCP element depends on these) ----
+       The hero H1 "SEIZE / THE DAY" uses bg-gradient-to-r + bg-clip-text +
+       from-cyan/via-purple/to-cyan + font-black. Without these inlined,
+       the gradient text waits for the deferred Tailwind bundle to render —
+       that's why WebPageTest showed LCP at 3.7s (2026-08-06 test). These
+       utilities are also used elsewhere on the page, so inlining them is
+       harmless. Same rule bodies as Tailwind emits, so the deferred bundle
+       becomes a no-op override. */
+    .font-black { font-weight: 900; }
+    .bg-gradient-to-r { background-image: linear-gradient(to right, var(--tw-gradient-stops)); }
+    .bg-clip-text { -webkit-background-clip: text; background-clip: text; }
+    .text-transparent { color: transparent; }
+    .from-cyan { --tw-gradient-from: var(--cyan) var(--tw-gradient-from-position); --tw-gradient-to: rgba(0, 242, 254, 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+    .via-purple { --tw-gradient-via: var(--purple) var(--tw-gradient-via-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to); }
+    .to-cyan { --tw-gradient-to: var(--cyan) var(--tw-gradient-to-position); }
   </style>
 
   <!-- The full global stylesheet (Portfolio, Pipeline, Contact, footer,
