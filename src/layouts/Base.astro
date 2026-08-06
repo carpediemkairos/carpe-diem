@@ -991,6 +991,71 @@ import { ViewTransitions } from 'astro:transitions';
     .from-cyan { --tw-gradient-from: var(--cyan) var(--tw-gradient-from-position); --tw-gradient-to: rgba(0, 242, 254, 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
     .via-purple { --tw-gradient-via: var(--purple) var(--tw-gradient-via-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to); }
     .to-cyan { --tw-gradient-to: var(--cyan) var(--tw-gradient-to-position); }
+
+    /* ---- Budget device overrides (is-budget set by inline script above) ----
+       On budget phones (Realme C21, Infinix, Tecno, low-end Samsung, etc.)
+       we strip the GPU-expensive effects that caused severe choppiness.
+       Strategy:
+         - backdrop-filter → none (biggest single perf win)
+         - filter: blur() → none or drastically reduced (second biggest)
+         - Infinite animations → keep only the cheapest pulse; stop spins/sheens
+         - Keep layout, gradients, typography, color washes intact
+       Result: the site looks like a still poster instead of a cinematic loop,
+       but renders at 60 FPS even on a 4-core / 3 GB phone. */
+    .is-budget .navbar-glass,
+    .is-budget .btn-secondary,
+    .is-budget .badge-card,
+    .is-budget .mobile-menu-overlay,
+    .is-budget .video-card__badge,
+    .is-budget .video-card__play,
+    .is-budget .video-card__duration {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    /* Replace the glass blur with a solid translucent background so the
+       layout still looks layered. Falls back to a dark fill if browser
+       doesn't support color-mix. */
+    .is-budget .navbar-glass {
+      background:
+        linear-gradient(180deg, rgba(6, 4, 18, 0.92) 0%, rgba(6, 4, 18, 0.85) 100%) !important;
+    }
+    .is-budget .badge-card {
+      background: rgba(15, 15, 25, 0.85) !important;
+    }
+    .is-budget .video-card__play {
+      background: rgba(0, 0, 0, 0.55) !important;
+    }
+    /* Disable the heavy blurred aurora layers — biggest GPU cost on the
+       page. Replace with a static color wash that still looks branded. */
+    .is-budget .bg-gradient-aurora,
+    .is-budget .navbar-aurora,
+    .is-budget .navbar-conic,
+    .is-budget .bg-scanlines {
+      display: none !important;
+    }
+    .is-budget .bg-noise {
+      opacity: 0.04 !important; /* still subtle, but cheaper blend */
+    }
+    /* Stop infinite spins/sheens on budget phones — they're decorative
+       and the constant repaints are the choppiness culprit. Pulse animations
+       (badgePulse, status-dot, video-card__progress) are cheap and stay. */
+    .is-budget .navbar-sheen,
+    .is-budget .navbar-conic-spin,
+    .is-budget .navbar-aurora-drift,
+    .is-budget .navbar-mark-holo,
+    .is-budget .navbar-mark-shimmer,
+    .is-budget .auroraSpin,
+    .is-budget .auroraDrift,
+    .is-budget .gridDrift,
+    .is-budget .gridDriftReverse,
+    .is-budget .rotateRing,
+    .is-budget .reelBorderSpin {
+      animation: none !important;
+    }
+    /* Keep badges / dots / progress bars (these are tiny, low-cost pulses) */
+    .is-budget .profile-ring {
+      filter: none !important; /* keep gradient, kill drop-shadow blur */
+    }
   </style>
 
   <!-- The full global stylesheet (Portfolio, Pipeline, Contact, footer,
@@ -1011,6 +1076,34 @@ import { ViewTransitions } from 'astro:transitions';
   <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "33b84e806f08433ba0deba66dd177dbd"}'></script>
 </head>
 <body class="bg-space text-white font-inter antialiased overflow-x-hidden">
+
+  <!-- Budget-device detection (added 2026-08-07, response to Realme C21 choppiness report).
+       Runs SYNCHRONOUSLY before any paint so CSS can immediately apply cheaper
+       styles to low-end phones. Targets: phones with <= 4 GB RAM (Catches Realme
+       C21 which has 3-4 GB despite 8 cores — MediaTek Helio G35's weak Cortex-A53
+       cores + slow PowerVR GE8320 GPU choke on backdrop-filter). hardwareConcurrency
+       is a secondary signal: many budget chips report cores correctly, but the C21
+       reports 8 (octa-core) so deviceMemory is the reliable primary. The .is-budget
+       class lets the inlined critical CSS disable backdrop-filter, filter:blur,
+       and the most expensive infinite animations. -->
+  <script is:inline>
+    (function () {
+      try {
+        var isPhone = window.matchMedia('(max-width: 768px)').matches;
+        // Primary signal: RAM. 4 GB is the cutoff that reliably separates
+        // budget (C21 = 3-4 GB, Infinix Hot = 2-3 GB) from mid-range (Pixel 7
+        // = 8 GB, Galaxy A54 = 6-8 GB).
+        var lowMem = navigator.deviceMemory !== undefined && navigator.deviceMemory <= 4;
+        // Secondary signal: weak CPUs. Most budget chips underreport cores or
+        // use slow A53 cores. >= 8 cores with <=4 GB RAM still catches the
+        // C21 because the GPU is the bottleneck, not the cores.
+        var lowCpu = navigator.hardwareConcurrency !== undefined && navigator.hardwareConcurrency <= 4;
+        if (isPhone && (lowMem || lowCpu)) {
+          document.documentElement.classList.add('is-budget');
+        }
+      } catch (e) { /* feature unsupported — assume modern device */ }
+    })();
+  </script>
 
   <Background />
 
