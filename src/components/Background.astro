@@ -1,0 +1,257 @@
+---
+// Cinematic 3D background: aurora + grid + Three.js orbiting objects with depth
+---
+
+<!-- Animated Background Layers -->
+<div class="bg-gradient-aurora" aria-hidden="true"></div>
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-grid-fine" aria-hidden="true"></div>
+<div class="bg-scanlines" aria-hidden="true"></div>
+
+<!-- Three.js Canvas (textured by the noise layer above it) -->
+<canvas id="three-canvas" aria-hidden="true"></canvas>
+
+<!-- Grain sits on top of the 3D canvas so the whole stack reads as textured, not hazy -->
+<div class="bg-noise" aria-hidden="true"></div>
+
+<script>
+  // Three.js Background — cinematic glossy objects, parallax depth, interactive cursor
+  (function () {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    // iPadOS Safari reports as desktop Safari unless the user is in desktop mode
+    // asking for the mobile site — match the iPad UA explicitly so we tune the
+    // 3D scene for it (fewer shapes, no antialias) and let the grid texture
+    // breathe instead of being buried under 12 metallic objects.
+    const isIPad = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isTablet = isIPad || (window.innerWidth >= 768 && window.innerWidth <= 1366 && 'ontouchstart' in window);
+
+    // Skip Three.js entirely on mobile/tablet — saves ~600 KB CDN download.
+    // The CSS background layers (bg-gradient-aurora, bg-grid, bg-grid-fine,
+    // bg-scanlines, bg-noise) still render, so the page isn't blank — just
+    // no 3D parallax. Added 2026-08-04 as Step 4 of the perf audit.
+    if (isMobile || isTablet) return;
+    const isLowPower = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
+    const antialias = !isMobile && !isTablet;
+    const shapeCount = isMobile ? 5 : (isTablet ? 7 : (isLowPower ? 8 : 12));
+
+    let threeLoaded = false;
+    const loadThree = () => {
+      if (threeLoaded) return;
+      threeLoaded = true;
+
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.textContent = `
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+        const canvas = document.getElementById('three-canvas');
+        if (!canvas) return;
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x05050a, 0.045);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 10);
+
+        const renderer = new THREE.WebGLRenderer({
+          canvas,
+          alpha: true,
+          antialias: ${antialias},
+          powerPreference: 'high-performance'
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+
+        // --- Lighting rig: key + fill + rim for that 3D glossy feel
+        const ambient = new THREE.AmbientLight(0x6080a0, 0.55);
+        scene.add(ambient);
+
+        const keyLight = new THREE.PointLight(0x00f2fe, 2.0, 30);
+        keyLight.position.set(6, 5, 6);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.PointLight(0x7000ff, 1.6, 30);
+        fillLight.position.set(-6, -3, 4);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.PointLight(0xff64dc, 1.2, 30);
+        rimLight.position.set(0, 6, -6);
+        scene.add(rimLight);
+
+        // --- Glossy material factory (metal + clearcoat = cinematic reflection)
+        const glass = (color) => new THREE.MeshPhysicalMaterial({
+          color,
+          metalness: 0.85,
+          roughness: 0.12,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+          reflectivity: 1.0,
+          emissive: color,
+          emissiveIntensity: 0.25
+        });
+
+        // Shape catalogue — mix of primitives + a torus knot for variety
+        const geoLibrary = [
+          () => new THREE.IcosahedronGeometry(0.55, 0),
+          () => new THREE.TorusGeometry(0.45, 0.16, 24, 64),
+          () => new THREE.OctahedronGeometry(0.5, 0),
+          () => new THREE.DodecahedronGeometry(0.5, 0),
+          () => new THREE.TetrahedronGeometry(0.55, 0),
+          () => new THREE.TorusKnotGeometry(0.35, 0.12, 80, 12),
+          () => new THREE.SphereGeometry(0.4, 32, 32),
+          () => new THREE.BoxGeometry(0.6, 0.6, 0.6)
+        ];
+
+        const palette = [0x00f2fe, 0x7000ff, 0xff64dc, 0xffffff, 0x00f2fe, 0x7000ff, 0xffffff, 0x00f2fe];
+        const shapes = [];
+
+        for (let i = 0; i < ${shapeCount}; i++) {
+          const geo = geoLibrary[i % geoLibrary.length]();
+          const mat = glass(palette[i % palette.length]);
+          const mesh = new THREE.Mesh(geo, mat);
+
+          // Distribute across a wide depth range for parallax
+          const depth = (Math.random() - 0.4) * 10 - 1;
+          mesh.position.set(
+            (Math.random() - 0.5) * 16,
+            (Math.random() - 0.5) * 10,
+            depth
+          );
+          const scale = 0.5 + Math.random() * 1.1;
+          mesh.scale.setScalar(scale);
+          mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+
+          mesh.userData = {
+            rotSpeed: {
+              x: (Math.random() - 0.5) * 0.004,
+              y: (Math.random() - 0.5) * 0.004,
+              z: (Math.random() - 0.5) * 0.002
+            },
+            floatSpeed: 0.4 + Math.random() * 0.6,
+            floatAmp: 0.25 + Math.random() * 0.5,
+            baseY: mesh.position.y,
+            baseX: mesh.position.x,
+            baseZ: mesh.position.z,
+            depth // for parallax
+          };
+          scene.add(mesh);
+          shapes.push(mesh);
+        }
+
+        // --- Mouse parallax (drives camera + each shape's own offset)
+        const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+        window.addEventListener('mousemove', (e) => {
+          mouse.tx = (e.clientX / window.innerWidth) * 2 - 1;
+          mouse.ty = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // --- Click ripple: spawn a brief expanding ring
+        function ripple(x, y) {
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.05, 0.08, 32),
+            new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+          );
+          const ndc = new THREE.Vector3(x, y, 0.5).unproject(camera);
+          ring.position.copy(ndc);
+          ring.lookAt(camera.position);
+          scene.add(ring);
+          const start = performance.now();
+          const tick = () => {
+            const t = (performance.now() - start) / 900;
+            if (t >= 1) { scene.remove(ring); ring.geometry.dispose(); ring.material.dispose(); return; }
+            const s = 0.3 + t * 4;
+            ring.scale.setScalar(s);
+            ring.material.opacity = 0.9 * (1 - t);
+            requestAnimationFrame(tick);
+          };
+          tick();
+        }
+        window.addEventListener('click', (e) => {
+          const x = (e.clientX / window.innerWidth) * 2 - 1;
+          const y = -(e.clientY / window.innerHeight) * 2 + 1;
+          ripple(x, y);
+        });
+
+        // --- Glass-panel specular highlight (mirrors the cursor on every .glass-panel)
+        document.querySelectorAll('.glass-panel').forEach((el) => {
+          el.addEventListener('mousemove', (e) => {
+            const r = el.getBoundingClientRect();
+            const x = ((e.clientX - r.left) / r.width) * 100;
+            const y = ((e.clientY - r.top) / r.height) * 100;
+            el.style.setProperty('--mx', x + '%');
+            el.style.setProperty('--my', y + '%');
+          });
+        });
+
+        // --- Resize
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+          }, 150);
+        });
+
+        // --- Animation loop
+        const clock = new THREE.Clock();
+        let frame = 0;
+        function animate() {
+          requestAnimationFrame(animate);
+          const dt = clock.getDelta();
+          const elapsed = clock.getElapsedTime();
+          frame++;
+
+          mouse.x += (mouse.tx - mouse.x) * 0.05;
+          mouse.y += (mouse.ty - mouse.y) * 0.05;
+
+          // Camera parallax (subtle 3D)
+          camera.position.x = mouse.x * 0.6;
+          camera.position.y = mouse.y * 0.4;
+          camera.lookAt(0, 0, 0);
+
+          shapes.forEach((s, i) => {
+            const d = s.userData;
+            s.rotation.x += d.rotSpeed.x;
+            s.rotation.y += d.rotSpeed.y;
+            s.rotation.z += d.rotSpeed.z;
+            s.position.y = d.baseY + Math.sin(elapsed * d.floatSpeed + i) * d.floatAmp;
+            s.position.x = d.baseX + Math.cos(elapsed * d.floatSpeed * 0.6 + i) * (d.floatAmp * 0.6);
+            // Depth parallax — far shapes move less, near shapes move more
+            const par = 0.15 + (d.depth + 5) / 20;
+            s.position.x += mouse.x * par;
+            s.position.y += mouse.y * par;
+          });
+
+          // Lights slowly orbit for a living-feel scene
+          keyLight.position.x = Math.cos(elapsed * 0.3) * 7;
+          keyLight.position.z = Math.sin(elapsed * 0.3) * 7;
+          fillLight.position.x = Math.cos(elapsed * 0.2 + Math.PI) * 7;
+          fillLight.position.z = Math.sin(elapsed * 0.2 + Math.PI) * 7;
+
+          // Mobile / tablet: render every other frame to save battery
+          if ((${isMobile} || ${isTablet}) && frame % 2 !== 0) return;
+          renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- Pause when tab is hidden
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) renderer.setAnimationLoop(null);
+        });
+      `;
+      document.body.appendChild(script);
+    };
+
+    setTimeout(loadThree, 800);
+    window.addEventListener('scroll', loadThree, { once: true, passive: true });
+  })();
+</script>

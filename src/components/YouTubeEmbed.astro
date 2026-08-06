@@ -1,0 +1,177 @@
+---
+// Lite YouTube Embed.
+// Renders only a thumbnail image + play button. The YouTube iframe
+// (~500 KB JS + 2 MB requests) is NOT loaded until the user clicks.
+//
+// Usage:
+//   <YouTubeEmbed videoId="dQw4w9WgXcQ" title="My Video" />
+//
+// When you don't have a video ID yet, pass an empty string and the
+// component renders a "Video coming soon" placeholder — keeps the grid
+// layout intact without loading anything.
+
+interface Props {
+  videoId?: string;
+  title?: string;
+  // Optional: render in compact mode (smaller play button). Useful for
+  // tight grids; matches the existing .portfolio-thumb aspect ratio.
+  compact?: boolean;
+}
+
+const { videoId = '', title = 'YouTube video', compact = false } = Astro.props;
+
+// YouTube thumbnail URL. We use maxresdefault for the cover image
+// (1280x720). YouTube returns a 120x90 placeholder if maxres isn't
+// available, so we keep the URL simple — ~30 KB per thumbnail.
+const thumbUrl = videoId
+  ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
+  : '';
+---
+
+{videoId ? (
+  <button
+    type="button"
+    class={`yt-embed ${compact ? 'yt-embed--compact' : ''}`}
+    data-yt-id={videoId}
+    data-yt-title={title}
+    aria-label={`Play ${title} on YouTube`}
+    style={`background-image: url('${thumbUrl}')`}
+  >
+    <span class="yt-embed__play" aria-hidden="true">
+      <svg viewBox="0 0 68 48" width="68" height="48">
+        <path
+          d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z"
+          fill="#f00"
+        />
+        <path d="M45 24 27 14v20" fill="#fff" />
+      </svg>
+    </span>
+  </button>
+) : (
+  <div
+    class={`yt-placeholder ${compact ? 'yt-placeholder--compact' : ''}`}
+    aria-label={`${title} — video coming soon`}
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32" aria-hidden="true">
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none" />
+    </svg>
+    <span class="yt-placeholder__label">Video coming soon</span>
+  </div>
+)}
+
+<style>
+  .yt-embed {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-size: cover;
+    background-position: center;
+    background-color: #0a0a14;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: inherit;
+    transition: transform 0.3s ease;
+  }
+  .yt-embed:hover { transform: scale(1.02); }
+  .yt-embed:focus-visible {
+    outline: 2px solid var(--cyan, #00f2fe);
+    outline-offset: 2px;
+  }
+
+  .yt-embed__play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease;
+  }
+  .yt-embed__play svg {
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
+    transition: transform 0.2s ease;
+  }
+  .yt-embed:hover .yt-embed__play svg { transform: scale(1.1); }
+
+  .yt-embed--compact .yt-embed__play svg {
+    width: 48px;
+    height: 34px;
+  }
+
+  /* The iframe that gets swapped in after click */
+  .yt-embed iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  /* Placeholder state when no video ID is set */
+  .yt-placeholder {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--silver, #c0c0c0);
+    background: linear-gradient(135deg, rgba(10, 10, 20, 0.6), rgba(20, 20, 40, 0.4));
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: inherit;
+  }
+  .yt-placeholder__label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+</style>
+
+<script>
+  // Click handler — route every YouTube embed click through the shared
+  // <dialog> lightbox (window.openLightbox, defined in Base.astro).
+  //
+  // Why a dialog and not an inline iframe swap:
+  //   There used to be two click handlers running on the same click —
+  //   this one (which replaced the play button with an unsized iframe
+  //   in-place) and the .video-card handler in Base.astro (which opened
+  //   the dialog with an empty video). The result was a tiny unsized
+  //   inline iframe + the dialog backdrop stacked on top.
+  //   Routing through openLightbox() makes the dialog the single path
+  //   for every YouTube click on the site, full-screen and 16:9.
+  //
+  // We use event delegation so one listener covers every .yt-embed on
+  // the page (Hero cards, Portfolio filter cards, any future embeds).
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const btn = target.closest<HTMLButtonElement>('.yt-embed');
+    if (!btn) return;
+    e.stopPropagation(); // don't let the .video-card handler also fire
+    const id = btn.dataset.ytId;
+    const title = btn.dataset.ytTitle || 'YouTube video';
+    if (!id) return; // placeholder has no video — let the card handler show "coming soon"
+
+    // Preferred path: open the shared dialog. openLightbox() also accepts
+    // an 11-char YouTube ID and builds the right iframe + params (Base.astro:362-375).
+    if (typeof (window as any).openLightbox === 'function') {
+      (window as any).openLightbox(title, id);
+      return;
+    }
+
+    // Fallback only — Base.astro's script hasn't run yet. Swap inline
+    // so the click is never dead. The iframe is sized to fill the card.
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+    iframe.title = title;
+    iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+    iframe.setAttribute('allowfullscreen', '');
+    iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;';
+    btn.replaceWith(iframe);
+  });
+</script>

@@ -1,0 +1,20 @@
+---
+import { getCollection } from 'astro:content';
+import PortfolioGrid from './PortfolioGrid.astro';
+import PortfolioFilter from './PortfolioFilter.astro';
+
+const projects = await getCollection('projects');
+---
+
+<section id="deep-work" class="relative py-20 md:py-32 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-12 reveal" data-reveal="up">
+      <p class="text-cyan text-xs sm:text-sm tracking-[0.4em] font-orbitron mb-2">PORTFOLIO</p>
+      <h2 class="font-orbitron font-bold text-3xl sm:text-4xl md:text-5xl mb-4">The Deep Work Showcase</h2>
+      <p class="text-silver max-w-2xl mx-auto text-sm sm:text-base">Four specialized pillars. Filter through sub-categories to explore the full body of work.</p>
+    </div>
+
+    <PortfolioGrid projects={projects} />
+    <PortfolioFilter />
+  </div>
+</section>

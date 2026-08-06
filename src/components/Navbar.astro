@@ -1,0 +1,77 @@
+---
+// Navigation bar — full liquid-glass treatment (aurora + rim + sheen + conic).
+// All IDs and classes used by Base.astro are preserved so scroll/mobile/CTA
+// behavior continues to work unchanged.
+---
+
+<nav id="navbar" class="navbar-glass">
+  <!-- Aurora drift behind the panel (slow, masked to the navbar footprint) -->
+  <div class="navbar-aurora" aria-hidden="true"></div>
+
+  <!-- Iridescent conic gloss — slow rotation behind the links -->
+  <div class="navbar-conic" aria-hidden="true"></div>
+
+  <!-- Top refractive ridge — thin tube of light just under the top edge -->
+  <div class="navbar-ridge" aria-hidden="true"></div>
+
+  <!-- Specular sheen — diagonal sweep, 12s loop -->
+  <div class="navbar-sheen" aria-hidden="true"></div>
+
+  <!-- Corner light flares -->
+  <div class="navbar-corner-tr" aria-hidden="true"></div>
+  <div class="navbar-corner-bl" aria-hidden="true"></div>
+
+  <!-- The actual nav content sits above all decorative layers -->
+  <div class="navbar-inner relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16 md:h-20">
+      <a href="#hero" class="navbar-mark font-orbitron font-black text-lg md:text-xl tracking-widest">
+        <span class="grad-cyan">CARPE</span><span class="grad-purple">/</span><span class="grad-white">DIEM</span>
+      </a>
+
+      <!-- Desktop menu -->
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#showcase" class="nav-link">SHOWCASE</a>
+        <a href="#deep-work" class="nav-link">WORK</a>
+        <a href="#pipeline" class="nav-link">PIPELINE</a>
+        <a href="#contact" class="nav-link">CONTACT</a>
+
+        <a href="#contact" id="hire-me-btn" class="btn btn-primary btn-sm btn-glow">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <span>HIRE ME</span>
+          <span class="status-dot-sm"></span>
+        </a>
+      </div>
+
+      <!-- Mobile menu button -->
+      <button id="mobile-menu-btn" class="btn btn-tertiary btn-icon md:hidden" aria-label="Toggle menu" aria-controls="mobile-menu" aria-expanded="false">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path id="menu-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Gradient accent line at the very bottom edge (visible against content below) -->
+  <div class="navbar-rim" aria-hidden="true"></div>
+</nav>
+
+<!-- Mobile menu (sibling of <nav>, not descendant, so backdrop-filter on <nav> doesn't trap its fixed positioning) -->
+<div id="mobile-menu" class="mobile-menu-overlay md:hidden" hidden aria-hidden="true">
+  <div class="mobile-menu-inner">
+    <a href="#showcase" class="mobile-link">Showcase</a>
+    <a href="#deep-work" class="mobile-link">Work</a>
+    <a href="#pipeline" class="mobile-link">Pipeline</a>
+    <a href="#contact" class="mobile-link">Contact</a>
+    <div class="pt-2 mt-1 border-t border-white/10">
+      <a href="#contact" id="mobile-hire-me-btn" class="btn btn-primary btn-block btn-sm">
+        <span class="status-dot-sm"></span>
+        <span>Hire Me Now</span>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-3.5 h-3.5">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</div>

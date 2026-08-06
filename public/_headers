@@ -1,0 +1,66 @@
+# Cloudflare Pages headers (perf audit 2026-08-05).
+#
+# When you deploy this site to Cloudflare Pages (pages.cloudflare.com),
+# this file is read at deploy time and applied as HTTP headers on each
+# response. It mirrors the rules we had in vercel.json so the perf wins
+# survive the host switch.
+#
+# What each block does:
+#
+# 1. /_assets/* (1 year, immutable)
+#    Built JS/CSS bundles have hashed filenames (e.g. hoisted.B8eB_Wxr.js).
+#    The hash changes when the content does, so 1-year cache is safe —
+#    the browser will get the new file the moment we ship a new hash.
+#    "immutable" tells the browser "this URL never changes content, never
+#    revalidate" which removes a network round-trip on repeat visits.
+#
+# 2. /fonts/* (1 year, immutable)
+#    We self-host variable fonts (Inter-VF.woff2, Orbitron-VF.woff2,
+#    JetBrainsMono-VF.woff2). They never change for the lifetime of a
+#    deployment, so 1-year immutable cache is the right call.
+#
+# 3. /images/* (1 year, immutable)
+#    Project thumbnails, profile.svg, etc. Same logic as fonts.
+#
+# 4. /favicon.svg, /favicon.ico (1 year, immutable)
+#    Favicons rarely change; cache aggressively.
+#
+# 5. /*.html (must-revalidate)
+#    The HTML pages MUST be revalidated on every visit so users see
+#    updates immediately. "max-age=0" forces the browser to send a
+#    conditional request (If-None-Match) which is cheap — just a 304
+#    Not Modified response if nothing changed.
+#
+# 6. /* (security headers)
+#    X-Content-Type-Options: prevents MIME sniffing attacks.
+#    Referrer-Policy: only send the origin (not full URL) when leaving.
+#    X-Frame-Options: block embedding in iframes (clickjacking protection).
+#    Permissions-Policy: disable camera, mic, geolocation — site doesn't
+#    use them, so we hard-block them as a privacy + security win.
+#
+# Format reference: https://developers.cloudflare.com/pages/configuration/headers
+
+/_assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/images/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon.svg
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon.ico
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

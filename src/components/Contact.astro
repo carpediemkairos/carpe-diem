@@ -1,0 +1,151 @@
+---
+// Categories with sub-categories, used by both the contact form <select>
+// and the dropdown sync script below. Keep `id` and `subs[*].id` stable;
+// they're submitted with the form.
+//
+// Categories are imported from src/data/categories.ts (the canonical
+// source of truth shared with PortfolioGrid.astro). The canonical data
+// includes an 'all' sub-category per pillar — that's a UI concept for
+// the portfolio filter, not a real brief type, so we strip it here so
+// the contact form's dropdown doesn't show "All" as a sub-category.
+// Consolidated 2026-08-04 (perf audit Step 5).
+import { categories } from '../data/categories';
+
+const contactCategories = categories.map(cat => ({
+  ...cat,
+  subs: cat.subs.filter(sub => sub.id !== 'all')
+}));
+---
+
+<section id="contact" class="relative py-20 md:py-32 px-4 sm:px-6 lg:px-8 section-defer">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-center mb-12 reveal" data-reveal="up">
+      <p class="text-cyan text-xs sm:text-sm tracking-[0.4em] font-orbitron mb-2">LET'S BUILD</p>
+      <h2 class="font-orbitron font-bold text-3xl sm:text-4xl md:text-5xl mb-4">Initiate Collaboration</h2>
+      <p class="text-silver max-w-xl mx-auto text-sm sm:text-base">Tell me about your project. Replies within 24 hours.</p>
+    </div>
+
+    <form id="contact-form" class="glass-panel glass-shine rounded-3xl p-6 sm:p-8 md:p-10 reveal contact-highlight" data-reveal="up" data-tilt="3">
+      <!-- Honeypot: real users never see or fill this; bots that auto-fill every input get silently dropped. -->
+      <input type="text" name="botcheck" class="hidden" style="position: absolute; left: -9999px;" tabindex="-1" autocomplete="off" aria-hidden="true" />
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+        <div class="form-group">
+          <label for="name" class="form-label">Your Name</label>
+          <input type="text" id="name" name="name" required class="form-input" placeholder="Jane Doe" />
+        </div>
+        <div class="form-group">
+          <label for="email" class="form-label">Email Address</label>
+          <input type="email" id="email" name="email" required class="form-input" placeholder="jane@brand.com" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+        <div class="form-group">
+          <label for="main-category" class="form-label">Main Category</label>
+          <select id="main-category" name="main_category" required class="form-input">
+            <option value="">Select a pillar</option>
+            {contactCategories.map(cat => (
+              <option value={cat.id}>{cat.label}</option>
+            ))}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="sub-category" class="form-label">Sub-Category</label>
+          <select id="sub-category" name="sub_category" required class="form-input" disabled>
+            <option value="">Select a main category first</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group mb-6">
+        <label for="message" class="form-label">Project Brief</label>
+        <textarea id="message" name="message" rows="5" required class="form-input resize-none" placeholder="Tell me about your project, deadlines, and vision..."></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg btn-block btn-glow group">
+        <span>Send Message</span>
+        <svg class="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+        </svg>
+      </button>
+    </form>
+  </div>
+</section>
+
+<!--
+  Sub-category dropdown data, embedded as a JSON island right next to the
+  form. Reading the data from a DOM element guarantees ordering: the JSON
+  element is parsed BEFORE any later <script> runs, so the sync script can
+  safely read it on first execution. Using a `data-script` flag lets us
+  confirm the script actually ran (visible in DevTools).
+-->
+<script id="contact-categories-data" type="application/json" set:html={JSON.stringify(contactCategories)} is:inline></script>
+
+<script is:inline>
+  (function initContactCategorySync() {
+    var dataEl = document.getElementById('contact-categories-data');
+    var mainSelect = document.getElementById('main-category');
+    var subSelect  = document.getElementById('sub-category');
+    if (!dataEl || !mainSelect || !subSelect) {
+      // Leave a breadcrumb so a stale-cache user can see whether the script
+      // ran at all (visible in DevTools → Elements → <html>).
+      document.documentElement.setAttribute('data-contact-sync', 'missing-elements');
+      return;
+    }
+
+    var categories;
+    try { categories = JSON.parse(dataEl.textContent || '[]'); }
+    catch (e) {
+      document.documentElement.setAttribute('data-contact-sync', 'json-parse-error');
+      return;
+    }
+    if (!Array.isArray(categories) || categories.length === 0) {
+      document.documentElement.setAttribute('data-contact-sync', 'empty-data');
+      return;
+    }
+
+    function renderSubs(selectedId) {
+      subSelect.innerHTML = '';
+      if (!selectedId) {
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = 'Select a main category first';
+        subSelect.appendChild(opt0);
+        subSelect.disabled = true;
+        subSelect.value = '';
+        return;
+      }
+      var cat = null;
+      for (var i = 0; i < categories.length; i++) {
+        if (categories[i] && categories[i].id === selectedId) { cat = categories[i]; break; }
+      }
+      if (!cat) return;
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Select a sub-category';
+      subSelect.appendChild(placeholder);
+      var subs = cat.subs || [];
+      for (var j = 0; j < subs.length; j++) {
+        var s = subs[j];
+        var opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.label;
+        subSelect.appendChild(opt);
+      }
+      subSelect.value = '';
+      subSelect.disabled = false;
+    }
+
+    // Initial state
+    renderSubs('');
+
+    // Sync sub-category on main-category change.
+    mainSelect.addEventListener('change', function () {
+      renderSubs(mainSelect.value);
+    });
+
+    // Mark the script as initialized so a hard refresh / cache-bust test can
+    // verify the new behavior took effect.
+    document.documentElement.setAttribute('data-contact-sync', 'ok');
+  })();
+</script>

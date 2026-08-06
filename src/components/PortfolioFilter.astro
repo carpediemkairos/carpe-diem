@@ -1,0 +1,194 @@
+---
+// Portfolio filter script island.
+// Tiny vanilla JS that mirrors what the old React component did:
+//   • track active main category + active sub filter
+//   • on click, swap the cards rendered inside #portfolio-grid
+//
+// No React, no hydration, ~1 KB of JS. Reuses window.openLightbox()
+// defined in Base.astro to open videos when a card is clicked.
+//
+// The cards themselves are pre-rendered server-side into a JSON island
+// (#portfolio-cards-data) keyed by (category, sub). This script just
+// picks the matching strings and swaps them into the grid — no card
+// ever sits in the DOM for a filter that isn't active.
+---
+
+<script>
+  (() => {
+    // -------- Lazy-load grid thumbnails (perf audit Step 2, 2026-08-05) --------
+    // Each card button has `data-thumb-url="..."` set by PortfolioGrid.astro
+    // instead of an inline `background-image:url(...)`. Browsers eagerly
+    // download every inline image in the initial HTML, so 24 grid thumbs
+    // would fetch ~430 KB before the visitor even scrolls. This observer
+    // only sets `style.backgroundImage` when the card is within 200px of
+    // the viewport, then stops watching that card. A 2s safety net
+    // guarantees any above-the-fold card still loads if the observer
+    // hasn't fired (e.g. IO unavailable, fast scroll, slow JS init).
+    const lazyThumbs = () => {
+      const targets = document.querySelectorAll<HTMLElement>('.yt-embed[data-thumb-url]');
+      if (!targets.length) return;
+
+      const reveal = (btn: HTMLElement) => {
+        const url = btn.getAttribute('data-thumb-url');
+        if (!url) return;
+        btn.style.backgroundImage = `url('${url}')`;
+        btn.removeAttribute('data-thumb-url');
+      };
+
+      if (!('IntersectionObserver' in window)) {
+        targets.forEach(reveal);
+        return;
+      }
+
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          reveal(e.target as HTMLElement);
+          io.unobserve(e.target);
+        }
+      }, { rootMargin: '200px 0px' });
+
+      targets.forEach((el) => io.observe(el));
+      // Safety net: if a card is already on screen at load and the observer
+      // hasn't fired yet, force-load it within 2s so above-the-fold cards
+      // never stay dark.
+      setTimeout(() => targets.forEach(reveal), 2000);
+    };
+    // Run once for the initial server-rendered cards
+    lazyThumbs();
+
+    const tabs = document.querySelectorAll<HTMLButtonElement>('[data-main-tab]');
+    const subGroups = document.querySelectorAll<HTMLElement>('[data-sub-group]');
+    const grid = document.getElementById('portfolio-grid');
+    const dataEl = document.getElementById('portfolio-cards-data');
+
+    if (!tabs.length || !grid || !dataEl) return;
+
+    // Parse the pre-rendered card HTML map
+    let cardsByCategory: Record<string, Record<string, string[]>>;
+    try {
+      cardsByCategory = JSON.parse(dataEl.textContent || '{}');
+    } catch {
+      return;
+    }
+
+    // Active filter state (start: narrative + "all")
+    const state = { main: 'narrative', sub: 'all' };
+
+    const attachCardListeners = () => {
+      grid!.querySelectorAll<HTMLElement>('[data-project-card]').forEach((card) => {
+        const trigger = () => {
+          const title = card.dataset.title || 'PROJECT';
+          const source = card.dataset.youtubeId || card.dataset.video || '';
+          if (typeof (window as any).openLightbox === 'function') {
+            (window as any).openLightbox(title, source);
+          } else {
+            const lightbox = document.getElementById('lightbox');
+            if (lightbox) {
+              lightbox.classList.remove('hidden');
+              lightbox.classList.add('flex');
+            }
+          }
+        };
+        card.addEventListener('click', trigger);
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            trigger();
+          }
+        });
+      });
+    };
+
+    const apply = () => {
+      // Update tabs
+      tabs.forEach((tab) => {
+        const isActive = tab.dataset.mainTab === state.main;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', String(isActive));
+      });
+
+      // Show/hide sub-filter groups (one per main category)
+      subGroups.forEach((group) => {
+        const isActive = group.dataset.subGroup === state.main;
+        group.classList.toggle('hidden', !isActive);
+      });
+
+      // Update sub-filter buttons within the active group
+      const activeGroup = document.querySelector<HTMLElement>(
+        `[data-sub-group="${state.main}"]`
+      );
+      activeGroup?.querySelectorAll<HTMLButtonElement>('[data-sub-filter]')
+        .forEach((btn) => {
+          const isActive = btn.dataset.subFilter === state.sub;
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-pressed', String(isActive));
+        });
+
+      // Swap the cards in the grid for the matching subset
+      const subset = cardsByCategory[state.main]?.[state.sub] ?? [];
+      if (subset.length === 0) {
+        grid!.innerHTML =
+          '<div data-empty-msg class="col-span-full text-center py-16"><p class="text-silver font-orbitron tracking-widest text-sm">NO PROJECTS IN THIS CATEGORY YET</p></div>';
+      } else {
+        grid!.innerHTML = subset.join('');
+      }
+
+      // Re-attach click listeners to the freshly-rendered cards
+      attachCardListeners();
+      // Re-run the lazy-load observer against the new cards so the
+      // brand-new <button> elements also get their thumbnails deferred
+      // until they enter the viewport.
+      lazyThumbs();
+    };
+
+    // Main tab clicks
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const id = tab.dataset.mainTab;
+        if (!id || id === state.main) return;
+        state.main = id;
+        state.sub = 'all'; // reset sub-filter when switching main category
+        apply();
+      });
+    });
+
+    // Sub-filter clicks (delegated on document so dynamically-removed groups don't break)
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest<HTMLButtonElement>('[data-sub-filter]');
+      if (!btn) return;
+      const id = btn.dataset.subFilter;
+      if (!id) return;
+      state.sub = id;
+      apply();
+    });
+
+    // Initial render — attach listeners to the cards that came from the server
+    attachCardListeners();
+
+    // YouTubeEmbed click handler — swap .yt-embed button for an iframe.
+    // Uses event delegation on document so we don't need 24 listeners.
+    // The iframe only loads when the user actually clicks, which keeps
+    // the initial page weight at ~30 KB per video (just the thumbnail)
+    // instead of ~500 KB per iframe.
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest<HTMLButtonElement>('.yt-embed');
+      if (!btn) return;
+      const id = btn.dataset.ytId;
+      const title = btn.dataset.ytTitle || 'YouTube video';
+      if (!id) return;
+
+      // Privacy-enhanced YouTube embed: youtube-nocookie.com + minimal chrome
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+      iframe.title = title;
+      iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.className = 'w-full h-full';
+
+      btn.replaceWith(iframe);
+    });
+  })();
+</script>

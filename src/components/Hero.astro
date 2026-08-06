@@ -1,0 +1,468 @@
+---
+// Hero section with profile and intro
+import YouTubeEmbed from './YouTubeEmbed.astro';
+
+// Showreel video IDs — leave empty for now.
+// When you have YouTube links ready, just paste the 11-char ID here
+// and the card automatically shows the thumbnail + plays in lightbox on click.
+// Step 6 (perf audit, 2026-08-05) — switched from Unsplash hotlinks to the
+// YouTubeEmbed lite-embed pattern. This is the last time you need to touch
+// the showreel for perf — every future video just needs its ID dropped in.
+const featuredReelId = '';    // e.g. 'dQw4w9WgXcQ' — Featured Reel 2026
+const commercialCutId = '';   // e.g. 'dQw4w9WgXcQ' — Commercial Cut
+const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
+---
+
+<header id="hero" class="relative min-h-screen pt-24 md:pt-32 pb-16 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Top Hero Row: Profile + Contact Badges.
+         xl: instead of lg: so iPad Pro (834-1024px portrait, 1024-1366px
+         landscape) stays in single-column mode. With lg: the two-column
+         layout kicked in on iPad Pro landscape and `items-center` pushed
+         the short cards column up next to the H1 — visually above the
+         hero CTA buttons in the taller profile column. Keeping it
+         single-column until xl (≥1280px) avoids that mismatch. -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 xl:gap-12 items-center mb-12 md:mb-20">
+
+      <!-- LEFT: Profile -->
+      <div class="flex flex-col sm:flex-row items-center sm:items-center gap-6 reveal" data-reveal="left" data-tilt="5">
+        <div class="relative w-32 h-32 sm:w-40 sm:h-40 flex-shrink-0">
+          <div class="absolute inset-0 rounded-full profile-ring"></div>
+          <div class="absolute inset-2 rounded-full overflow-hidden glass-panel flex items-center justify-center">
+            <img src="/images/profile.svg" alt="CD CarpeDiem monogram" class="w-full h-full object-cover" width="160" height="160" />
+          </div>
+        </div>
+        <div class="text-center sm:text-left">
+          <h1 class="font-orbitron font-black text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-[1.05] tracking-tight">
+            <span class="block">SEIZE</span>
+            <span class="block bg-gradient-to-r from-cyan via-purple to-cyan bg-clip-text text-transparent whitespace-nowrap">/ THE DAY</span>
+          </h1>
+          <p class="hero-statement mt-4 sm:mt-5 max-w-xl text-center sm:text-left">
+            <span class="hero-statement__lead">Every frame</span>
+            <span class="hero-statement__lead-soft">is a chance to seize the moment</span>
+            <span class="hero-statement__em">—</span>
+            <span class="hero-statement__lead-soft">I make sure none are wasted.</span>
+          </p>
+
+          <!-- Hero CTA Buttons
+               Default (≥640px): each button is full-width and the container
+               allows wrapping, so the two buttons stack vertically. This
+               keeps them out of the four-card column's vertical zone on
+               medium devices and stops them from crowding the cards on
+               large devices.
+
+               At ≤640px we override via the .hero-cta-row rule in
+               global.css — flex-nowrap + flex-1 forces them side-by-side
+               with equal width, and the .btn-lg override shrinks the
+               padding so both fit on a 375px viewport. -->
+          <div class="hero-cta-row flex flex-wrap gap-3 mt-6 justify-center sm:justify-start">
+            <a href="#showcase" class="btn btn-primary btn-lg group w-full justify-center" data-magnet="0.15">
+              <svg class="w-4 h-4 transition-transform group-hover:scale-110" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              <span>View Showreel</span>
+              <svg class="w-4 h-4 transition-transform group-hover:translate-y-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </a>
+            <a href="#contact" id="start-project-btn" class="btn btn-secondary btn-lg group w-full justify-center" data-magnet="0.15">
+              <span>Start a Project</span>
+              <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+              </svg>
+            </a>
+          </div>
+
+          <!-- Hero Stats — each number carries the same cyan→white gradient
+               logic as the new hero statement, so the row reads as one design
+               language instead of three flat colored digits. Numbers count
+               up from 0 to their target the first time the row enters the
+               viewport; see the script below. -->
+          <div id="hero-stats" class="flex flex-wrap gap-4 sm:gap-6 mt-6 justify-center sm:justify-start">
+            <div class="text-center sm:text-left">
+              <p class="hero-stat hero-stat--cyan font-orbitron text-2xl sm:text-3xl font-black">
+                <span class="hero-stat__num" data-count-to="100">0</span><span class="hero-stat__plus">+</span>
+              </p>
+              <p class="text-silver text-[10px] sm:text-xs uppercase tracking-[0.18em] mt-1">Projects</p>
+            </div>
+            <div class="hero-stat-divider w-px bg-white/10"></div>
+            <div class="text-center sm:text-left">
+              <p class="hero-stat hero-stat--purple font-orbitron text-2xl sm:text-3xl font-black">
+                <span class="hero-stat__num" data-count-to="2">0</span><span class="hero-stat__plus">+</span>
+              </p>
+              <p class="text-silver text-[10px] sm:text-xs uppercase tracking-[0.18em] mt-1">Years</p>
+            </div>
+            <div class="hero-stat-divider w-px bg-white/10"></div>
+            <div class="text-center sm:text-left">
+              <p class="hero-stat hero-stat--neutral font-orbitron text-2xl sm:text-3xl font-black">
+                <span class="hero-stat__num" data-count-to="10">0</span><span class="hero-stat__plus">+</span>
+              </p>
+              <p class="text-silver text-[10px] sm:text-xs uppercase tracking-[0.18em] mt-1">Clients</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Contact Badges — on small screens these compact vertically
+           (smaller icon + tighter padding) via .badge-card / .badge-icon
+           overrides in global.css so the four cards take less hero height. -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 reveal stagger" data-reveal="right">
+        <button
+          type="button"
+          id="copy-email-btn"
+          class="badge-card text-left w-full"
+          data-email="carpediem.kairos1@gmail.com"
+          aria-label="Copy email address to clipboard"
+        >
+          <div class="badge-icon">✉</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-silver uppercase tracking-wider">Email</p>
+            <p class="text-sm font-semibold truncate">
+              <span id="email-display">carpediem••••@•••.com</span>
+              <span id="email-copy-hint" class="text-cyan text-xs ml-1">Copy</span>
+            </p>
+          </div>
+        </button>
+        <a href="https://wa.me/8801570252961" target="_blank" rel="noopener noreferrer" class="badge-card">
+          <div class="badge-icon">💬</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-silver uppercase tracking-wider">WhatsApp</p>
+            <p class="text-sm font-semibold truncate">Message me on WhatsApp</p>
+          </div>
+        </a>
+        <a href="#" class="badge-card">
+          <div class="badge-icon">📱</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-silver uppercase tracking-wider">Socials</p>
+            <p class="text-sm font-semibold truncate">@carpe.diem</p>
+          </div>
+        </a>
+        <div class="badge-card status-online">
+          <div class="badge-icon"><span class="status-dot"></span></div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-silver uppercase tracking-wider">Status</p>
+            <p class="text-sm font-semibold text-green-400">🟢 Open for Booking</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Showreel Video Card -->
+    <div id="showcase" class="showreel-section reveal" data-reveal="up">
+      <div class="showreel-heading">
+        <span class="showreel-heading__line" aria-hidden="true"></span>
+        <p class="showreel-heading__chip font-orbitron">
+          <span class="showreel-heading__chip-dot"></span>
+          <span>BUSINESS TRAILER · 2026</span>
+        </p>
+        <h2 class="showreel-heading__title">Cinematic Showreel</h2>
+        <p class="showreel-heading__sub">A 60-second journey through my best cinematic, commercial, and retention work.</p>
+        <span class="showreel-heading__line showreel-heading__line--bottom" aria-hidden="true"></span>
+      </div>
+
+      <div class="showreel-container glass-panel glass-shine p-2 sm:p-3">
+
+        <!-- Mobile-only cover card. On desktop this is hidden and the regular
+             2-col grid below takes over. The :has() selector won't fly for
+             graceful degradation, so we lean on the showreel-stack container
+             to coordinate mobile vs desktop children. -->
+        <div class="showreel-stack">
+          <!-- Featured reel — full-bleed cover card on mobile.
+               Step 6: replaced <video poster> + Unsplash hotlink with
+               <YouTubeEmbed>. Empty videoId renders the "Video coming soon"
+               placeholder (no broken state, no 404). Drop the ID in
+               `featuredReelId` above when ready. -->
+          <div class="video-card video-card--featured video-card--cover video-card--yt relative group"
+               data-title="Featured Reel 2026">
+            <div class="video-card__grain" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--top" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--bottom" aria-hidden="true"></div>
+            <div class="video-card__vignette" aria-hidden="true"></div>
+
+            <YouTubeEmbed videoId={featuredReelId} title="Featured Reel 2026" compact={false} />
+
+            <!-- NOW PLAYING badge -->
+            <div class="video-card__badge">
+              <span class="video-card__pulse" aria-hidden="true"></span>
+              <span class="font-orbitron text-[10px] sm:text-xs tracking-[0.3em]">NOW PLAYING</span>
+            </div>
+
+            <!-- Center play button -->
+            <div class="video-card__play" aria-hidden="true">
+              <span class="video-card__play-ring"></span>
+              <span class="video-card__play-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </span>
+            </div>
+
+            <!-- Meta + label on hover -->
+            <div class="video-card__meta">
+              <div class="video-card__meta-row">
+                <span class="font-orbitron text-[11px] sm:text-sm tracking-widest text-cyan">FEATURED REEL • 2026</span>
+                <span class="video-card__duration">02:14</span>
+              </div>
+              <div class="video-card__meta-sub">
+                <span>Director / Editor</span>
+                <span class="video-card__dot"></span>
+                <span>Color: ACES</span>
+                <span class="video-card__dot"></span>
+                <span>4K HDR</span>
+              </div>
+              <!-- Mobile-only progress bar. Filled by JS while the video plays. -->
+              <div class="video-card__progress" aria-hidden="true">
+                <div class="video-card__progress-fill"></div>
+              </div>
+              <div class="video-card__credits" aria-hidden="true">
+                <span>DIRECTED &amp; EDITED BY CARPE / DIEM</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile-only horizontal scroll rail of secondary reels -->
+          <div class="showreel-rail">
+            <div class="video-card video-card--secondary video-card--rail video-card--yt aspect-video relative group"
+                 data-title="Commercial Cut">
+              <YouTubeEmbed videoId={commercialCutId} title="Commercial Cut" compact={true} />
+              <div class="video-card__grain" aria-hidden="true"></div>
+              <div class="video-card__letterbox video-card__letterbox--top" aria-hidden="true"></div>
+              <div class="video-card__letterbox video-card__letterbox--bottom" aria-hidden="true"></div>
+              <div class="video-card__vignette" aria-hidden="true"></div>
+              <div class="video-card__play video-card__play--sm" aria-hidden="true">
+                <span class="video-card__play-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </span>
+              </div>
+              <div class="video-card__meta video-card__meta--rail">
+                <div class="video-card__meta-row">
+                  <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-cyan">COMMERCIAL CUT</span>
+                  <span class="video-card__duration">00:48</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="video-card video-card--secondary video-card--rail video-card--yt aspect-video relative group"
+                 data-title="Narrative Work">
+              <YouTubeEmbed videoId={narrativeWorkId} title="Narrative Work" compact={true} />
+              <div class="video-card__grain" aria-hidden="true"></div>
+              <div class="video-card__letterbox video-card__letterbox--top" aria-hidden="true"></div>
+              <div class="video-card__letterbox video-card__letterbox--bottom" aria-hidden="true"></div>
+              <div class="video-card__vignette" aria-hidden="true"></div>
+              <div class="video-card__play video-card__play--sm" aria-hidden="true">
+                <span class="video-card__play-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </span>
+              </div>
+              <div class="video-card__meta video-card__meta--rail">
+                <div class="video-card__meta-row">
+                  <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-purple">NARRATIVE WORK</span>
+                  <span class="video-card__duration">01:32</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="video-card video-card--rail video-card--placeholder aspect-video relative group"
+                 aria-label="More reels coming soon">
+              <div class="video-card__placeholder-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                  <rect x="4" y="11" width="16" height="10" rx="2"/>
+                  <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                </svg>
+              </div>
+              <span class="video-card__placeholder-label font-orbitron">MORE COMING SOON</span>
+            </div>
+          </div>
+
+          <!-- Mobile-only dot indicator. Filled by JS based on scroll position. -->
+          <div class="showreel-rail-dots" aria-hidden="true">
+            <span class="showreel-rail-dot is-active"></span>
+            <span class="showreel-rail-dot"></span>
+            <span class="showreel-rail-dot"></span>
+          </div>
+        </div>
+
+        <!-- Desktop grid (unchanged). Hidden below md via the parent container. -->
+        <div class="showreel-desktop-grid grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+
+          <!-- Featured reel (full-width, top).
+               Step 6: same YouTubeEmbed lite-embed as mobile — same ID
+               wired in via featuredReelId. Zero duplication needed. -->
+          <div class="md:col-span-2 video-card video-card--featured video-card--yt aspect-video relative group" data-title="Featured Reel 2026">
+            <YouTubeEmbed videoId={featuredReelId} title="Featured Reel 2026" compact={false} />
+            <div class="video-card__grain" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--top" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--bottom" aria-hidden="true"></div>
+            <div class="video-card__vignette" aria-hidden="true"></div>
+
+            <!-- NOW PLAYING badge -->
+            <div class="video-card__badge">
+              <span class="video-card__pulse" aria-hidden="true"></span>
+              <span class="font-orbitron text-[10px] sm:text-xs tracking-[0.3em]">NOW PLAYING</span>
+            </div>
+
+            <!-- Center play button -->
+            <div class="video-card__play" aria-hidden="true">
+              <span class="video-card__play-ring"></span>
+              <span class="video-card__play-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </span>
+            </div>
+
+            <!-- Meta + label on hover -->
+            <div class="video-card__meta">
+              <div class="video-card__meta-row">
+                <span class="font-orbitron text-[11px] sm:text-sm tracking-widest text-cyan">FEATURED REEL • 2026</span>
+                <span class="video-card__duration">02:14</span>
+              </div>
+              <div class="video-card__meta-sub">
+                <span>Director / Editor</span>
+                <span class="video-card__dot"></span>
+                <span>Color: ACES</span>
+                <span class="video-card__dot"></span>
+                <span>4K HDR</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary card 1 -->
+          <div class="video-card video-card--secondary video-card--yt aspect-video relative group" data-title="Commercial Cut">
+            <YouTubeEmbed videoId={commercialCutId} title="Commercial Cut" compact={true} />
+            <div class="video-card__grain" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--top" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--bottom" aria-hidden="true"></div>
+            <div class="video-card__vignette" aria-hidden="true"></div>
+
+            <div class="video-card__play video-card__play--sm" aria-hidden="true">
+              <span class="video-card__play-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </span>
+            </div>
+
+            <div class="video-card__meta">
+              <div class="video-card__meta-row">
+                <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-cyan">COMMERCIAL CUT</span>
+                <span class="video-card__duration">00:48</span>
+              </div>
+              <div class="video-card__meta-sub">
+                <span>Brand Spot</span>
+                <span class="video-card__dot"></span>
+                <span>4K</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary card 2 -->
+          <div class="video-card video-card--secondary video-card--yt aspect-video relative group" data-title="Narrative Work">
+            <YouTubeEmbed videoId={narrativeWorkId} title="Narrative Work" compact={true} />
+            <div class="video-card__grain" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--top" aria-hidden="true"></div>
+            <div class="video-card__letterbox video-card__letterbox--bottom" aria-hidden="true"></div>
+            <div class="video-card__vignette" aria-hidden="true"></div>
+
+            <div class="video-card__play video-card__play--sm" aria-hidden="true">
+              <span class="video-card__play-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </span>
+            </div>
+
+            <div class="video-card__meta">
+              <div class="video-card__meta-row">
+                <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-purple">NARRATIVE WORK</span>
+                <span class="video-card__duration">01:32</span>
+              </div>
+              <div class="video-card__meta-sub">
+                <span>Short Film</span>
+                <span class="video-card__dot"></span>
+                <span>Color Grade</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<script is:inline>
+  // Hero stats count-up.
+  // Each .hero-stat__num has data-count-to="N"; on first viewport entry we
+  // animate from 0 → N with a pronounced ease-out so the digits glide in
+  // and settle instead of snapping. Honors prefers-reduced-motion by
+  // jumping straight to the target value. Re-entering the viewport does
+  // NOT replay — once is enough for a stats line.
+  (function () {
+    const row = document.getElementById('hero-stats');
+    if (!row) return;
+    const nums = row.querySelectorAll('.hero-stat__num');
+    if (!nums.length) return;
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Longer durations + a stronger ease curve makes the deceleration
+    // feel like the digits are settling into place rather than ticking.
+    const durationFor = (target) => (target >= 100 ? 2200 : 1700);
+
+    // Ease-out quint: very fast start, long gentle tail into the final
+    // value. Combined with the longer duration above, the last 20% of
+    // the animation is almost a glide.
+    const easeOutQuint = (t) => 1 - Math.pow(1 - t, 5);
+
+    const animate = (el) => {
+      const target = parseInt(el.dataset.countTo, 10) || 0;
+      if (reduceMotion || target === 0) {
+        el.textContent = String(target);
+        return;
+      }
+      const duration = durationFor(target);
+      const start = performance.now();
+      const tick = (now) => {
+        const elapsed = now - start;
+        const t = Math.min(elapsed / duration, 1);
+        const value = Math.round(easeOutQuint(t) * target);
+        el.textContent = String(value);
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          // Guarantee the final frame paints exactly the target, even if
+          // a rounding edge left us at target-1.
+          el.textContent = String(target);
+        }
+      };
+      requestAnimationFrame(tick);
+    };
+
+    // If the row is already in the viewport at load (short pages, refresh
+    // mid-scroll), animate immediately. Otherwise wait for first entry.
+    const rect = row.getBoundingClientRect();
+    const inViewport = rect.top < window.innerHeight && rect.bottom > 0;
+
+    if (inViewport) {
+      nums.forEach(animate);
+    } else if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            nums.forEach(animate);
+            io.disconnect();
+          }
+        });
+      }, { threshold: 0.4 });
+      io.observe(row);
+    } else {
+      // No IO support — just show the final values.
+      nums.forEach(animate);
+    }
+  })();
+</script>
