@@ -410,16 +410,6 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Budget devices (Realme C21, Infinix, etc.): skip the count-up animation
-    // entirely. The animation is cheap alone but the RAF + paint cost adds
-    // to the choppy feel. Set the final values immediately.
-    if (window.__isBudget) {
-      nums.forEach((el) => {
-        el.textContent = el.dataset.countTo || '0';
-      });
-      return;
-    }
-
     // Longer durations + a stronger ease curve makes the deceleration
     // feel like the digits are settling into place rather than ticking.
     const durationFor = (target) => (target >= 100 ? 2200 : 1700);

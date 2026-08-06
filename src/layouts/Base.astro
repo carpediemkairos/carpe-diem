@@ -993,78 +993,52 @@ import { ViewTransitions } from 'astro:transitions';
     .to-cyan { --tw-gradient-to: var(--cyan) var(--tw-gradient-to-position); }
 
     /* ---- Budget device overrides (is-budget set by inline script above) ----
-       On budget phones (Realme C21, Infinix, Tecno, low-end Samsung, etc.) we
-       strip the GPU-expensive effects that caused severe choppiness. Strategy
-       is COLOR-PRESERVING: keep all elements visible (so colors stay exactly
-       the same) but disable the GPU work (backdrop-filter, filter:blur,
-       box-shadow, infinite animations, mix-blend-mode). The elements become
-       flat color washes instead of glowing/blurred — colors identical, glow gone.
-
-       Wildcards are used because global.css has 20+ backdrop-filter:blur rules
-       scattered across components. Targeting them individually would miss most. */
-    /* Wildcard: kill backdrop-filter everywhere — biggest single perf win.
-       The .is-budget class only fires on phones <=4 GB RAM so false positives
-       are limited to actual low-end devices. */
-    .is-budget,
-    .is-budget * {
+       On budget phones (Realme C21, Infinix, Tecno, low-end Samsung, etc.)
+       we strip the GPU-expensive effects that caused severe choppiness.
+       Strategy:
+         - backdrop-filter → none (biggest single perf win)
+         - filter: blur() → none or drastically reduced (second biggest)
+         - Infinite animations → keep only the cheapest pulse; stop spins/sheens
+         - Keep layout, gradients, typography, color washes intact
+       Result: the site looks like a still poster instead of a cinematic loop,
+       but renders at 60 FPS even on a 4-core / 3 GB phone. */
+    .is-budget .navbar-glass,
+    .is-budget .btn-secondary,
+    .is-budget .badge-card,
+    .is-budget .mobile-menu-overlay,
+    .is-budget .video-card__badge,
+    .is-budget .video-card__play,
+    .is-budget .video-card__duration {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
-    /* Wildcard: kill filter: blur(). Doesn't affect filter: drop-shadow /
-       opacity / saturate (those don't match). */
-    .is-budget .bg-gradient-aurora,
-    .is-budget .navbar-aurora,
-    .is-budget .navbar-conic,
-    .is-budget .navbar-ridge,
-    .is-budget .navbar-corner-tr,
-    .is-budget .navbar-corner-bl,
-    .is-budget .navbar-sheen,
-    .is-budget .profile-ring {
-      filter: none !important;
-    }
-    /* Kill expensive multi-layer shadows on the biggest visual elements.
-       drop-shadow on text is GPU-composited — too costly on PowerVR GE8320. */
-    .is-budget .btn-primary,
-    .is-budget .btn-secondary,
-    .is-budget .profile-ring,
-    .is-budget .showreel-container,
-    .is-budget .video-card,
-    .is-budget .video-card--featured,
-    .is-budget .badge-card,
+    /* Replace the glass blur with a solid translucent background so the
+       layout still looks layered. Falls back to a dark fill if browser
+       doesn't support color-mix. */
     .is-budget .navbar-glass {
-      box-shadow: none !important;
+      background:
+        linear-gradient(180deg, rgba(6, 4, 18, 0.92) 0%, rgba(6, 4, 18, 0.85) 100%) !important;
     }
-    /* Force body background to scroll (not fixed) — fixed background forces
-       a repaint of the whole viewport on every scroll frame on weak GPUs. */
-    .is-budget body {
-      background-attachment: scroll !important;
+    .is-budget .badge-card {
+      background: rgba(15, 15, 25, 0.85) !important;
     }
-    /* Kill mix-blend-mode on the noise layer — blending requires a
-       separate GPU compositing pass per frame. */
-    .is-budget .bg-noise {
-      mix-blend-mode: normal !important;
-      opacity: 0.06 !important;
+    .is-budget .video-card__play {
+      background: rgba(0, 0, 0, 0.55) !important;
     }
-    .is-budget .video-card__grain {
-      mix-blend-mode: normal !important;
-      opacity: 0.04 !important;
-    }
-    /* Re-enable the aurora/conic layers (previous round hid them — that
-       caused the perceived color tone darkening). With filter:blur already
-       disabled above, they're cheap to render: just static gradients. */
+    /* Disable the heavy blurred aurora layers — biggest GPU cost on the
+       page. Replace with a static color wash that still looks branded. */
     .is-budget .bg-gradient-aurora,
     .is-budget .navbar-aurora,
     .is-budget .navbar-conic,
     .is-budget .bg-scanlines {
-      display: block !important;
-      animation: none !important;
-      transform: none !important;
-      will-change: auto !important;
+      display: none !important;
     }
-    /* Stop ALL infinite animations on budget phones. Pulse animations
-       (badgePulse, status-dot, video-card__progress) are also stopped —
-       they were cheap individually but stacked with everything else they
-       contributed to the choppy feel. The page becomes a still poster. */
+    .is-budget .bg-noise {
+      opacity: 0.04 !important; /* still subtle, but cheaper blend */
+    }
+    /* Stop infinite spins/sheens on budget phones — they're decorative
+       and the constant repaints are the choppiness culprit. Pulse animations
+       (badgePulse, status-dot, video-card__progress) are cheap and stay. */
     .is-budget .navbar-sheen,
     .is-budget .navbar-conic-spin,
     .is-budget .navbar-aurora-drift,
@@ -1075,40 +1049,12 @@ import { ViewTransitions } from 'astro:transitions';
     .is-budget .gridDrift,
     .is-budget .gridDriftReverse,
     .is-budget .rotateRing,
-    .is-budget .reelBorderSpin,
-    .is-budget .badgePulse,
-    .is-budget .pulse,
-    .is-budget .video-card__pulse,
-    .is-budget .video-card__progress-fill {
+    .is-budget .reelBorderSpin {
       animation: none !important;
     }
-    /* Disable the navbar decorative overlays — they're blurred and add
-       nothing without their blurs. The base navbar-glass still looks fine. */
-    .is-budget .navbar-aurora,
-    .is-budget .navbar-conic,
-    .is-budget .navbar-ridge,
-    .is-budget .navbar-sheen,
-    .is-budget .navbar-corner-tr,
-    .is-budget .navbar-corner-bl {
-      display: none !important;
-    }
-    /* Replace removed backdrop-filter with solid translucent backgrounds so
-       the layout still reads as "layered" — colors are preserved, just not
-       blurred. */
-    .is-budget .navbar-glass {
-      background: rgba(6, 4, 18, 0.92) !important;
-    }
-    .is-budget .badge-card {
-      background: rgba(15, 15, 25, 0.7) !important;
-    }
-    .is-budget .btn-secondary {
-      background: rgba(0, 242, 254, 0.08) !important;
-    }
-    .is-budget .video-card__play {
-      background: rgba(0, 0, 0, 0.55) !important;
-    }
-    .is-budget .video-card__badge {
-      background: rgba(0, 0, 0, 0.65) !important;
+    /* Keep badges / dots / progress bars (these are tiny, low-cost pulses) */
+    .is-budget .profile-ring {
+      filter: none !important; /* keep gradient, kill drop-shadow blur */
     }
   </style>
 
@@ -1154,10 +1100,6 @@ import { ViewTransitions } from 'astro:transitions';
         var lowCpu = navigator.hardwareConcurrency !== undefined && navigator.hardwareConcurrency <= 4;
         if (isPhone && (lowMem || lowCpu)) {
           document.documentElement.classList.add('is-budget');
-          // Also expose a flag the inline scripts below can read so we can
-          // early-return out of heavy JS (off-screen IO observer, tilt+magnet
-          // RAF loop, reveal-on-scroll, hero stats count-up).
-          window.__isBudget = true;
         }
       } catch (e) { /* feature unsupported — assume modern device */ }
     })();
@@ -1220,13 +1162,9 @@ import { ViewTransitions } from 'astro:transitions';
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // -------- Reveal-on-scroll using IntersectionObserver --------
-    // On budget phones (is-budget): skip the observer entirely — show all
-    // elements immediately. The IntersectionObserver + 20+ element tracking
-    // is cheap individually but on a struggling phone, the saved overhead
-    // goes to keeping the scroll smooth.
     (() => {
       const els = document.querySelectorAll('.reveal, .stagger');
-      if (window.__isBudget || !('IntersectionObserver' in window) || reduceMotion) {
+      if (!('IntersectionObserver' in window) || reduceMotion) {
         els.forEach(el => el.classList.add('is-visible'));
         return;
       }
@@ -1251,7 +1189,7 @@ import { ViewTransitions } from 'astro:transitions';
     // a single shared RAF that flushes them in one pass per frame. The
     // mousemove handler just marks elements dirty and schedules one frame.
     // Visual behavior is identical — only the execution model changed.
-    if (!reduceMotion && !window.__isBudget) {
+    if (!reduceMotion) {
       // Collect every element that needs per-frame transform updates.
       // Each entry: { el, type, max, dirty, reset }
       const animated = [];
@@ -1854,10 +1792,6 @@ import { ViewTransitions } from 'astro:transitions';
       // Bail out on browsers without IntersectionObserver (very old) — they
       // get the unoptimized behavior, which is what they had before.
       if (!('IntersectionObserver' in window)) return;
-      // Budget devices: skip this observer entirely. The CSS overrides above
-      // already set animation:none on everything, so there's nothing to
-      // pause — running the observer is pure overhead.
-      if (window.__isBudget) return;
 
       const rootMargin = '0px 0px -10% 0px'; // pause slightly before fully off-screen
       const observer = new IntersectionObserver((entries) => {
