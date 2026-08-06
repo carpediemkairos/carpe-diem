@@ -3,7 +3,7 @@ import tailwind from '@astrojs/tailwind';
 import mdx from '@astrojs/mdx';
 
 export default defineConfig({
-  site: 'https://carpe-diem1.pages.dev',
+  site: 'https://carpediem1.pages.dev',
   integrations: [
     tailwind({ applyBaseStyles: false }),
     mdx()
