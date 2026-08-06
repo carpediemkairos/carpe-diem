@@ -986,6 +986,13 @@ import { ViewTransitions } from 'astro:transitions';
        to start painting. The full sheet fills in the rest of the page
        styles as it loads — no FOUC because the visible region is already
        styled. -->
+
+  <!-- Cloudflare Web Analytics (real-user performance monitoring).
+       Free, cookie-less, no impact on LCP. type=module means it never
+       blocks render. Dashboard: https://dash.cloudflare.com → Analytics
+       & Logs → Web Analytics. Token is for carpediem1.pages.dev
+       (installed 2026-08-07). -->
+  <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "33b84e806f08433ba0deba66dd177dbd"}'></script>
 </head>
 <body class="bg-space text-white font-inter antialiased overflow-x-hidden">
 
