@@ -372,9 +372,18 @@
     transform: skewX(-18deg);
     animation: footer-spec 24s linear infinite;
   }
+  /* Step 5 perf audit (2026-08-07): the previous `footer-spec` keyframe
+     animated `left` from -50% to 150%, which forces a layout reflow on
+     every frame. The spec highlight is now driven by `transform:
+     translateX()` instead — pixel-equivalent travel (translateX values
+     match the original left delta, accounting for the element's own
+     width: 90% of the footer panel), compositor-only, no reflow. The
+     static `left: -50%` on .footer-spec stays as the rest position;
+     the keyframe just adds a transform on top. The skewX is folded
+     into the keyframe transform so it isn't lost during the animation. */
   @keyframes footer-spec {
-    0%   { left: -50%; }
-    100% { left: 150%; }
+    0%   { transform: translateX(0%)         skewX(-18deg); }
+    100% { transform: translateX(222.2222%)  skewX(-18deg); }
   }
 
   /* Vignette — gently darkens the corners to push focus inward */
@@ -410,9 +419,18 @@
     animation: footer-sheen 14s linear infinite;
     z-index: 0;
   }
+  /* Step 5 perf audit (2026-08-07): the previous `footer-sheen` keyframe
+     animated `left` from -25% to 125%, which forces a layout reflow on
+     every frame. The sheen is now driven by `transform: translateX()`
+     instead — pixel-equivalent travel (translateX values match the
+     original left delta, accounting for the element's own width: 60%
+     of the footer panel), compositor-only, no reflow. The static
+     `left: -25%` on .footer-sheen stays as the rest position; the
+     keyframe just adds a transform on top. The skewX is folded into
+     the keyframe transform so it isn't lost during the animation. */
   @keyframes footer-sheen {
-    0%   { left: -25%; }
-    100% { left: 125%; }
+    0%   { transform: translateX(0%)         skewX(-12deg); }
+    100% { transform: translateX(291.6667%)  skewX(-12deg); }
   }
 
   /* SVG fractal-noise grain — gives the gloss a film-like depth */
