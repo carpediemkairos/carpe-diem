@@ -53,6 +53,17 @@ import { ViewTransitions } from 'astro:transitions';
 
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
+  <!-- Preload the hero profile SVG (LCP element).
+       Step 2 (perf audit): the profile avatar is the LCP element
+       (Cloudflare Web Analytics, 2026-08-07). Without this preload,
+       the fetch doesn't start until CSS+HTML parsing reaches the
+       <img> tag in Hero.astro. Starting the request during HTML parse
+       shaves ~300-800ms off LCP on slow connections. Paired with
+       fetchpriority="high" on the <img> itself, this is the canonical
+       LCP-optimization pattern. SVG is text-based and tiny (<5KB),
+       so the preload cost is negligible. -->
+  <link rel="preload" href="/images/profile.svg" as="image" type="image/svg+xml" fetchpriority="high" />
+
   <!-- Preconnect to YouTube's CDN before the user clicks play.
        Step 8 (perf audit, 2026-08-05): the iframe only loads on click
        (lite-embed pattern), but starting the DNS handshake + TCP/TLS
@@ -512,11 +523,26 @@ import { ViewTransitions } from 'astro:transitions';
     .btn-lg { padding: 1rem 2rem; font-size: 1.0625rem; }
     .btn-block { width: 100%; }
 
-    /* ---- Profile ring (the spinning conic gradient around the avatar) ---- */
+    /* ---- Profile ring (the spinning conic gradient around the avatar) ----
+       Step 2 (perf audit): previously had `filter: drop-shadow(...)` on
+       the rotating .profile-ring. CSS filters create a stacking context
+       that can composite-defer the inner <img> (the LCP element) on
+       weaker GPUs — contributing to the 45% LCP-Poor rate. The glow is
+       now a static box-shadow on the inner .glass-panel, which is far
+       cheaper and lets the LCP paint independently of the ring. */
     .profile-ring {
       background: conic-gradient(from 0deg, var(--cyan), var(--purple), var(--cyan));
       animation: rotateRing 6s linear infinite;
-      filter: drop-shadow(0 0 12px rgba(0, 242, 254, 0.5));
+    }
+    /* The cyan glow that used to be a filter on .profile-ring now lives
+       on the static inner panel — visually identical, zero compositing cost.
+       Sits alongside .glass-panel's own shadow (which is defined in
+       global.css and applied to the same element). */
+    .profile-ring + .glass-panel {
+      box-shadow:
+        0 0 12px rgba(0, 242, 254, 0.5),
+        0 8px 32px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
     .profile-ring::after {
       content: "";
@@ -765,18 +791,45 @@ import { ViewTransitions } from 'astro:transitions';
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 18px rgba(0, 242, 254, 0.15);
       pointer-events: none;
     }
+    /* Pulse dot on the "NOW PLAYING" badge.
+       Step 4 (perf audit, 2026-08-07): the previous `badgePulse` keyframe
+       animated `box-shadow` from 0 → 8px and back — that's a paint-only
+       property and was the worst single INP offender on the page (824ms
+       on mid-range phones). The ripple is now built on a ::after
+       pseudo-element driven by `transform: scale()` + `opacity`, both
+       compositor-only. The visual is identical: an 8×8 cyan halo that
+       expands outward and fades to zero, repeating every 1.8s.
+
+       Implementation note: the parent .video-card__pulse stays a static
+       cyan circle (no animation, no box-shadow). The ::after starts at
+       the dot's exact size (scale 1, opacity 0.7) and ends scaled up to
+       ~2.25x with opacity 0 — same easing curve (ease-out) and same
+       timing (1.8s) as the original, so the perceived ripple matches.
+       The will-change hint lets the browser promote the pseudo-element
+       to its own layer so the parent doesn't repaint either. */
     .video-card__pulse {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       background: var(--cyan);
-      box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7);
+      position: relative;
+      will-change: transform;
+    }
+    .video-card__pulse::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--cyan);
+      opacity: 0.7;
+      transform: scale(1);
+      will-change: transform, opacity;
       animation: badgePulse 1.8s ease-out infinite;
     }
     @keyframes badgePulse {
-      0%   { box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7); }
-      70%  { box-shadow: 0 0 0 8px rgba(0, 242, 254, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(0, 242, 254, 0); }
+      0%   { transform: scale(1);    opacity: 0.7; }
+      70%  { transform: scale(2.25); opacity: 0;   }
+      100% { transform: scale(2.25); opacity: 0;   }
     }
     .video-card__play {
       position: absolute;
