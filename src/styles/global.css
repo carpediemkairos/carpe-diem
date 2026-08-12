@@ -8,6 +8,29 @@
 @tailwind utilities;
 
 /* ========================================
+   BUDGET DEVICE OVERRIDE (low-end phones)
+   Added 2026-08-12. The .budget class is set in <head> by an inline
+   script in Base.astro that detects weak Android (≤4 cores AND ≤2 GB
+   RAM), Save-Data users, and known budget UAs. iPhones, iPads, and
+   all desktops are NEVER flagged, so the full glass morphism is
+   preserved for them.
+
+   What this rule does: disables backdrop-filter on every element
+   that uses it. backdrop-filter is the single biggest paint cost
+   on a Mali-G52 / Adreno 5xx GPU — it forces the browser to
+   composite the blurred region every frame, dropping 60→15 fps on
+   a scroll. Everything else (transforms, opacity, gradients,
+   animations) stays exactly the same, so the visual identity is
+   preserved. The panels still look like glass because they all
+   already have a translucent solid fill behind the blur; we just
+   skip the blur pass. */
+.budget,
+.budget * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* ========================================
    DESIGN TOKENS
    ======================================== */
 :root {

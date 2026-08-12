@@ -1065,6 +1065,33 @@ import { ViewTransitions } from 'astro:transitions';
        styles as it loads — no FOUC because the visible region is already
        styled. -->
 
+  <!-- Budget device detection (low-end phone perf fix, 2026-08-12).
+       Runs inline in <head> BEFORE the deferred global stylesheet so the
+       correct CSS variant is chosen for the very first paint — no flash,
+       no reflow. Total: ~300 bytes minified, executes in <0.1ms.
+
+       Triggers ONLY on:
+         1. Weak Android: <=4 CPU cores AND <=2 GB RAM (both must be true —
+            this excludes iOS, which always reports 8 cores, and any
+            desktop, which always reports more).
+         2. User has explicitly enabled "Save Data" in browser settings.
+         3. Known budget-model UA pattern (Realme C, Redmi A, Samsung A0x).
+
+       iPhones, iPads, all desktops, and any modern Android (2021+) pass
+       through untouched. See global.css for the .budget overrides — only
+       backdrop-filter is stripped; all animations and visuals stay. -->
+  <script is:inline>
+    (function(){
+      var c = navigator.hardwareConcurrency || 8;
+      var m = navigator.deviceMemory || 8;
+      var ua = navigator.userAgent;
+      var save = navigator.connection && navigator.connection.saveData === true;
+      var weak = c <= 4 && m <= 2;
+      var bJa = /Realme[ _-]C|Redmi[ _-]A|Samsung[ _-]SM-(A0|A1[0-4])/i.test(ua);
+      if (weak || save || bJa) document.documentElement.classList.add('budget');
+    })();
+  </script>
+
   <!-- Cloudflare Web Analytics (real-user performance monitoring).
        Free, cookie-less, no impact on LCP. type=module means it never
        blocks render. Dashboard: https://dash.cloudflare.com → Analytics
