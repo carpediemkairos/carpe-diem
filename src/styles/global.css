@@ -2507,10 +2507,12 @@ header[id] {
     }
 
     /* ============================================================
-       Cover card — vertical 4:5 framing, like a Netflix poster
-       ============================================================ */
+       Cover card — 16:9 on mobile to match desktop + YouTube's native ratio.
+       Previous 4:5 portrait was awkward on phones: it squished the 16:9
+       thumbnail (huge letterbox bars), wasted vertical space, and broke
+       the cinematic feel (read like a poster, not a video). */
     .video-card--cover {
-        aspect-ratio: 4 / 5;       /* Portrait — reads as a curated piece */
+        aspect-ratio: 16 / 9;
         border-radius: 1.25rem;
         /* Tighter shadow stack — mobile doesn't need the desktop's massive glow */
         box-shadow:
