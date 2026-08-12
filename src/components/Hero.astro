@@ -8,9 +8,12 @@ import YouTubeEmbed from './YouTubeEmbed.astro';
 // Step 6 (perf audit, 2026-08-05) — switched from Unsplash hotlinks to the
 // YouTubeEmbed lite-embed pattern. This is the last time you need to touch
 // the showreel for perf — every future video just needs its ID dropped in.
-const featuredReelId = '';    // e.g. 'dQw4w9WgXcQ' — Featured Reel 2026
-const commercialCutId = '';   // e.g. 'dQw4w9WgXcQ' — Commercial Cut
-const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
+const featuredReelId = 'EnTc0U6ASCM';    // e.g. 'dQw4w9WgXcQ' — Featured Reel 2026
+const featuredReelDuration = '07:10';   // shown on the thumbnail — update when you swap the ID
+const commercialCutId = 'EnTc0U6ASCM';   // e.g. 'dQw4w9WgXcQ' — Commercial Cut
+const commercialCutDuration = '07:10';
+const narrativeWorkId = 'EnTc0U6ASCM';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
+const narrativeWorkDuration = '07:10';
 ---
 
 <header id="hero" class="relative min-h-screen pt-24 md:pt-32 pb-16 px-4 sm:px-6 lg:px-8">
@@ -202,7 +205,7 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
             <div class="video-card__meta">
               <div class="video-card__meta-row">
                 <span class="font-orbitron text-[11px] sm:text-sm tracking-widest text-cyan">FEATURED REEL • 2026</span>
-                <span class="video-card__duration">02:14</span>
+                <span class="video-card__duration">{featuredReelDuration}</span>
               </div>
               <div class="video-card__meta-sub">
                 <span>Director / Editor</span>
@@ -221,9 +224,12 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
             </div>
           </div>
 
-          <!-- Mobile-only horizontal scroll rail of secondary reels -->
-          <div class="showreel-rail">
-            <div class="video-card video-card--secondary video-card--rail video-card--yt aspect-video relative group"
+          <!-- Mobile-only secondary reels in a 2-col grid (no horizontal scroll).
+               Each tile keeps the same compact play button + slim meta label
+               from the old rail, but pairs side-by-side instead of swiping.
+               Replaces the old .showreel-rail + dots (removed in global.css). -->
+          <div class="showreel-secondary-grid">
+            <div class="video-card video-card--secondary video-card--grid video-card--yt aspect-video relative group"
                  data-title="Commercial Cut">
               <YouTubeEmbed videoId={commercialCutId} title="Commercial Cut" compact={true} />
               <div class="video-card__grain" aria-hidden="true"></div>
@@ -237,15 +243,15 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
                   </svg>
                 </span>
               </div>
-              <div class="video-card__meta video-card__meta--rail">
+              <div class="video-card__meta video-card__meta--grid">
                 <div class="video-card__meta-row">
                   <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-cyan">COMMERCIAL CUT</span>
-                  <span class="video-card__duration">00:48</span>
+                  <span class="video-card__duration">{commercialCutDuration}</span>
                 </div>
               </div>
             </div>
 
-            <div class="video-card video-card--secondary video-card--rail video-card--yt aspect-video relative group"
+            <div class="video-card video-card--secondary video-card--grid video-card--yt aspect-video relative group"
                  data-title="Narrative Work">
               <YouTubeEmbed videoId={narrativeWorkId} title="Narrative Work" compact={true} />
               <div class="video-card__grain" aria-hidden="true"></div>
@@ -259,31 +265,13 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
                   </svg>
                 </span>
               </div>
-              <div class="video-card__meta video-card__meta--rail">
+              <div class="video-card__meta video-card__meta--grid">
                 <div class="video-card__meta-row">
                   <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-purple">NARRATIVE WORK</span>
-                  <span class="video-card__duration">01:32</span>
+                  <span class="video-card__duration">{narrativeWorkDuration}</span>
                 </div>
               </div>
             </div>
-
-            <div class="video-card video-card--rail video-card--placeholder aspect-video relative group"
-                 aria-label="More reels coming soon">
-              <div class="video-card__placeholder-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
-                  <rect x="4" y="11" width="16" height="10" rx="2"/>
-                  <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
-                </svg>
-              </div>
-              <span class="video-card__placeholder-label font-orbitron">MORE COMING SOON</span>
-            </div>
-          </div>
-
-          <!-- Mobile-only dot indicator. Filled by JS based on scroll position. -->
-          <div class="showreel-rail-dots" aria-hidden="true">
-            <span class="showreel-rail-dot is-active"></span>
-            <span class="showreel-rail-dot"></span>
-            <span class="showreel-rail-dot"></span>
           </div>
         </div>
 
@@ -320,7 +308,7 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
             <div class="video-card__meta">
               <div class="video-card__meta-row">
                 <span class="font-orbitron text-[11px] sm:text-sm tracking-widest text-cyan">FEATURED REEL • 2026</span>
-                <span class="video-card__duration">02:14</span>
+                <span class="video-card__duration">{featuredReelDuration}</span>
               </div>
               <div class="video-card__meta-sub">
                 <span>Director / Editor</span>
@@ -351,7 +339,7 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
             <div class="video-card__meta">
               <div class="video-card__meta-row">
                 <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-cyan">COMMERCIAL CUT</span>
-                <span class="video-card__duration">00:48</span>
+                <span class="video-card__duration">{commercialCutDuration}</span>
               </div>
               <div class="video-card__meta-sub">
                 <span>Brand Spot</span>
@@ -380,7 +368,7 @@ const narrativeWorkId = '';   // e.g. 'dQw4w9WgXcQ' — Narrative Work
             <div class="video-card__meta">
               <div class="video-card__meta-row">
                 <span class="font-orbitron text-[10px] sm:text-xs tracking-widest text-purple">NARRATIVE WORK</span>
-                <span class="video-card__duration">01:32</span>
+                <span class="video-card__duration">{narrativeWorkDuration}</span>
               </div>
               <div class="video-card__meta-sub">
                 <span>Short Film</span>

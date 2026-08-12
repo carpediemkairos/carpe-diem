@@ -1515,37 +1515,10 @@ import { ViewTransitions } from 'astro:transitions';
         requestAnimationFrame(tick);
       }
 
-      // --- Rail dot indicator ---
-      // As the user scrolls the .showreel-rail horizontally, the dot
-      // corresponding to the centered tile is marked .is-active.
-      const rail = document.querySelector('.showreel-rail');
-      const dots = document.querySelectorAll('.showreel-rail-dot');
-      const railTiles = document.querySelectorAll('.showreel-rail > .video-card');
-
-      if (rail && dots.length && railTiles.length === dots.length) {
-        const setActiveDot = () => {
-          // Find the tile whose center is closest to the rail's center.
-          const railRect = rail.getBoundingClientRect();
-          const center = railRect.left + railRect.width / 2;
-          let bestIdx = 0;
-          let bestDist = Infinity;
-          railTiles.forEach((tile, i) => {
-            const r = tile.getBoundingClientRect();
-            const tileCenter = r.left + r.width / 2;
-            const dist = Math.abs(tileCenter - center);
-            if (dist < bestDist) { bestDist = dist; bestIdx = i; }
-          });
-          dots.forEach((d, i) => d.classList.toggle('is-active', i === bestIdx));
-        };
-        // Throttle scroll handling with rAF for perf
-        let raf = null;
-        rail.addEventListener('scroll', () => {
-          if (raf) cancelAnimationFrame(raf);
-          raf = requestAnimationFrame(setActiveDot);
-        }, { passive: true });
-        // Initial state
-        setActiveDot();
-      }
+      // (Rail dot indicator removed 2026-08-12 — the horizontal scroll
+      //  rail was replaced by a 2-col grid of secondary reels, so there
+      //  is nothing left for the dots to indicate. Mobile now reads as
+      //  one big featured card + a 2-up grid below.)
     })();
 
     // Showreel cards open the lightbox with the placeholder

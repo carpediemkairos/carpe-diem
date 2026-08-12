@@ -2594,95 +2594,30 @@ header[id] {
     }
 
     /* ============================================================
-       Horizontal scroll rail of secondary reels
-       ============================================================ */
-    .showreel-rail {
-        display: flex;
+       Mobile secondary reels — 2-col grid (replaces old scroll rail,
+       removed 2026-08-12). The featured reel stays full-width on top;
+       these two tiles sit side-by-side below it. Tighter radius and
+       letterbox than the featured one so they read as supporting work,
+       not another hero. */
+    .showreel-secondary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.7rem;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: x mandatory;
-        -webkit-overflow-scrolling: touch;
-        /* Allow horizontal bleed — cards extend past the showreel-container
-           padding so the rail feels like a separate "lane" */
-        margin: 0 -0.5rem;
-        padding: 0 0.5rem 0.25rem;
-        /* Hide scrollbar visually but keep it functional */
-        scrollbar-width: none;
     }
-    .showreel-rail::-webkit-scrollbar { display: none; }
-
-    /* Each tile takes ~72% of the visible width, snaps to start on swipe */
-    .video-card--rail {
-        flex: 0 0 72%;
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
+    .video-card--grid {
         border-radius: 0.85rem;
     }
-    /* Slightly tighter letterbox on the rail tiles */
-    .video-card--rail .video-card__letterbox {
+    /* Slightly tighter letterbox on the grid tiles */
+    .video-card--grid .video-card__letterbox {
         height: 5%;
     }
 
-    /* Slim meta label for the rail — no sub-row, smaller text */
-    .video-card__meta--rail {
+    /* Slim meta label for the grid tiles — no sub-row, smaller text */
+    .video-card__meta--grid {
         padding: 0.55rem 0.7rem 0.65rem;
     }
-    .video-card__meta--rail .video-card__meta-row {
+    .video-card__meta--grid .video-card__meta-row {
         gap: 0.4rem;
-    }
-
-    /* Placeholder tile — the "MORE COMING SOON" card */
-    .video-card--placeholder {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.65rem;
-        background:
-            radial-gradient(120% 100% at 50% 50%, rgba(112, 0, 255, 0.12), transparent 60%),
-            linear-gradient(145deg, rgba(20, 20, 30, 0.7), rgba(8, 8, 14, 0.85));
-        border-style: dashed;
-        border-color: rgba(255, 255, 255, 0.12);
-        cursor: default;
-        color: rgba(255, 255, 255, 0.45);
-    }
-    .video-card__placeholder-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .video-card__placeholder-label {
-        font-size: 9px;
-        letter-spacing: 0.25em;
-    }
-
-    /* ============================================================
-       Rail dot indicator
-       ============================================================ */
-    .showreel-rail-dots {
-        display: flex;
-        justify-content: center;
-        gap: 6px;
-        margin-top: 0.85rem;
-    }
-    .showreel-rail-dot {
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.18);
-        transition: background 0.25s ease, transform 0.25s ease, width 0.25s ease;
-    }
-    .showreel-rail-dot.is-active {
-        background: var(--cyan);
-        transform: scaleX(1.4);
-        border-radius: 4px;
-        width: 14px;
     }
 
     /* ============================================================
