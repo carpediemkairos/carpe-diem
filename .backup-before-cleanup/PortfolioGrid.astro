@@ -6,6 +6,15 @@
 // (narrative + "all"). All other categories' cards are pre-rendered as
 // HTML strings inside a <script type="application/json"> island so the
 // filter script can swap them in instantly without any network request.
+//
+// Step 2 (perceived-speed fix, 2026-08-08): the initial server-render
+// keeps the staggered animation-delay so the cascade on first load
+// looks the same as before. Tab/sub-filter swaps go through the
+// filter script, which strips animation-delay so cards appear
+// instantly instead of one-by-one over 300ms (the previous behavior
+// made category switches feel slow with empty placeholder cards).
+// We tag initial-render cards with data-initial-render so the filter
+// can distinguish "first paint" from "tab swap".
 
 import { categories } from '../data/categories.ts';
 import type { CollectionEntry } from 'astro:content';
@@ -23,7 +32,14 @@ const sortedProjects = [...projects].sort(
 
 // Pre-render each project card as an HTML string, keyed by category+sub.
 // The filter script picks the matching strings and swaps them in.
-function renderCardHtml(item: CollectionEntry<'projects'>, i: number): string {
+//
+// `isInitial` = true on the very first server-render (narrative + "all").
+// Those cards get the staggered animation-delay so the cascade on first
+// paint looks identical to before. Tab/sub-filter swaps pass isInitial
+// = false so the swap is instant — no per-card 60ms wait, which on
+// placeholder cards read as "site is slow" even though the DOM swap
+// itself is <16ms.
+function renderCardHtml(item: CollectionEntry<'projects'>, i: number, isInitial: boolean): string {
   const c = item.data.category;
   const s = item.data.subCategory;
   const title = item.data.title;
@@ -61,13 +77,17 @@ function renderCardHtml(item: CollectionEntry<'projects'>, i: number): string {
   //   correctly. Without cover, the intrinsic 1280×720 image would
   //   render at top-left of the card and only show a quadrant.
   const thumbHtml = youtubeId
-    ? `<button type="button" class="yt-embed" data-yt-id="${youtubeId}" data-yt-title="${title}" aria-label="Play ${title} on YouTube"><img src="${thumbUrl}" alt="${title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" /><span class="yt-embed__play" aria-hidden="true"><svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#f00"/><path d="M45 24 27 14v20" fill="#fff"/></svg></span></button>`
+    ? `<button type="button" class="yt-embed" data-yt-id="${youtubeId}" data-yt-title="${title}" data-thumb-url="${thumbUrl}" aria-label="Play ${title} on YouTube" style="background-size:cover;background-position:center"><span class="yt-embed__play" aria-hidden="true"><svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#f00"/><path d="M45 24 27 14v20" fill="#fff"/></svg></span></button>`
     : `<div class="yt-placeholder" aria-label="${title} — video coming soon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none"/></svg><span class="yt-placeholder__label">Video coming soon</span></div>`;
 
   // Escape attributes that go into HTML
   const safeTitle = String(title).replace(/"/g, '&quot;');
 
-  return `<article data-project-card data-category="${c}" data-sub-category="${s}" data-slug="${item.slug}" data-title="${safeTitle}" data-youtube-id="${youtubeId}" data-video="${video}" class="portfolio-item" style="animation-delay:${i * 60}ms" role="button" tabindex="0" data-tilt="8" aria-label="Open ${safeTitle}"><div class="portfolio-thumb">${thumbHtml}</div><div class="portfolio-info"><div class="portfolio-tags">${tagsHtml}</div><h3 class="portfolio-title">${title}</h3><p class="portfolio-desc">${desc}</p></div></article>`;
+  // animation-delay only on the initial server-render (cascade on first
+  // paint). Tab/sub-filter swaps omit it so cards appear all at once.
+  const animStyle = isInitial ? `animation-delay:${i * 60}ms` : '';
+  const initialMarker = isInitial ? ' data-initial-render="true"' : '';
+  return `<article data-project-card${initialMarker} data-category="${c}" data-sub-category="${s}" data-slug="${item.slug}" data-title="${safeTitle}" data-youtube-id="${youtubeId}" data-video="${video}" class="portfolio-item" style="${animStyle}" role="button" tabindex="0" data-tilt="8" aria-label="Open ${safeTitle}"><div class="portfolio-thumb">${thumbHtml}</div><div class="portfolio-info"><div class="portfolio-tags">${tagsHtml}</div><h3 class="portfolio-title">${title}</h3><p class="portfolio-desc">${desc}</p></div></article>`;
 }
 
 // Build a map: { "narrative": { "all": [cardHtml, ...], "documentary": [...], ... }, ... }
@@ -79,8 +99,11 @@ for (const cat of categories) {
   }
 }
 
+// All card strings stored in the JSON island go in WITHOUT
+// animation-delay — the filter script will swap them in on tab/sub
+// change, where we want them to appear instantly.
 sortedProjects.forEach((p, i) => {
-  const html = renderCardHtml(p, i);
+  const html = renderCardHtml(p, i, false);
   const c = p.data.category;
   const s = p.data.subCategory;
   cardsByCategory[c].all.push(html);
@@ -89,8 +112,11 @@ sortedProjects.forEach((p, i) => {
   }
 });
 
-// What to render initially: narrative + "all"
-const initialCards = cardsByCategory['narrative'].all;
+// What to render initially: narrative + "all", WITH animation-delay so
+// the first-paint cascade is identical to before this fix.
+const initialCards = sortedProjects
+  .filter((p) => p.data.category === 'narrative')
+  .map((p, i) => renderCardHtml(p, i, true));
 ---
 
 {/* Main Category Tabs */}

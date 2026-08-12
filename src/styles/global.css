@@ -1560,7 +1560,7 @@ a.badge-card:hover .badge-icon {
        card scrolls into view, at which point the real height replaces it.
        This pairs with the filter's .hidden class so hidden cards cost ~0
        rendering work, and visible-but-off-screen cards skip work too. */
-    content-visibility: auto;
+    content-visibility: visible;
     contain-intrinsic-size: 0 300px;
 }
 

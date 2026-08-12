@@ -11,9 +11,29 @@
 // (#portfolio-cards-data) keyed by (category, sub). This script just
 // picks the matching strings and swaps them into the grid — no card
 // ever sits in the DOM for a filter that isn't active.
----
+//
+// Step 2 (perceived-speed fix, 2026-08-08): on tab/sub-filter swap
+// we strip `animation-delay` from card inline styles so the new
+// cards appear all at once. On the initial server-render the cascade
+// is preserved (cards fade in one-by-one over ~300ms) — that effect
+// is pleasant on first paint but reads as "slow" on tab-switches
+// where everything else is already painted. The JSON island cards
+// no longer carry a delay (PortfolioGrid.astro sets it only on
+// initial render), but we strip defensively here too in case of
+// any future regression.
+// ---
 
 <script>
+  // Step 2 (perceived-speed fix, 2026-08-08): strip animation-delay from
+  // card HTML strings so tab/sub-filter swaps paint all at once instead of
+  // one-by-one over 300ms. Cards from the JSON island already arrive
+  // without delay (PortfolioGrid.astro sets it only on initial render),
+  // but stripping here is defensive against any future regression.
+  // Built as a separate function so the regex is constructed once and
+  // not on every tab click.
+  const stripAnimDelay = (html) =>
+    html.replace(/ style="animation-delay:[^"]*"/, '');
+
   (() => {
     // -------- Lazy-load grid thumbnails (perf audit Step 2, 2026-08-05) --------
     // Each card button has `data-thumb-url="..."` set by PortfolioGrid.astro
@@ -77,8 +97,7 @@
 
     const attachCardListeners = () => {
       grid!.querySelectorAll<HTMLElement>('[data-project-card]').forEach((card) => {
-        const trigger = (e: Event) => {
-          e.stopPropagation(); // don't let YouTubeEmbed.astro's document handler also call openLightbox()
+        const trigger = () => {
           const title = card.dataset.title || 'PROJECT';
           const source = card.dataset.youtubeId || card.dataset.video || '';
           if (typeof (window as any).openLightbox === 'function') {
@@ -95,7 +114,7 @@
         card.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            trigger(e);
+            trigger();
           }
         });
       });
@@ -132,7 +151,11 @@
         grid!.innerHTML =
           '<div data-empty-msg class="col-span-full text-center py-16"><p class="text-silver font-orbitron tracking-widest text-sm">NO PROJECTS IN THIS CATEGORY YET</p></div>';
       } else {
-        grid!.innerHTML = subset.join('');
+        // Step 2 (perceived-speed fix, 2026-08-08): strip animation-delay
+        // from each card before injecting so the whole grid appears at
+        // once instead of one-by-one over 300ms.
+        const instantSubset = subset.map(stripAnimDelay);
+        grid!.innerHTML = instantSubset.join('');
       }
 
       // Re-attach click listeners to the freshly-rendered cards
@@ -167,5 +190,29 @@
 
     // Initial render — attach listeners to the cards that came from the server
     attachCardListeners();
+
+    // YouTubeEmbed click handler — swap .yt-embed button for an iframe.
+    // Uses event delegation on document so we don't need 24 listeners.
+    // The iframe only loads when the user actually clicks, which keeps
+    // the initial page weight at ~30 KB per video (just the thumbnail)
+    // instead of ~500 KB per iframe.
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest<HTMLButtonElement>('.yt-embed');
+      if (!btn) return;
+      const id = btn.dataset.ytId;
+      const title = btn.dataset.ytTitle || 'YouTube video';
+      if (!id) return;
+
+      // Privacy-enhanced YouTube embed: youtube-nocookie.com + minimal chrome
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+      iframe.title = title;
+      iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.className = 'w-full h-full';
+
+      btn.replaceWith(iframe);
+    });
   })();
 </script>
