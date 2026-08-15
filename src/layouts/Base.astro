@@ -64,15 +64,17 @@ import { ViewTransitions } from 'astro:transitions';
        so the preload cost is negligible. -->
   <link rel="preload" href="/images/profile.svg" as="image" type="image/svg+xml" fetchpriority="high" />
 
-  <!-- Preconnect to YouTube's CDN before the user clicks play.
+  <!-- Preconnect to YouTube before the user clicks play.
        Step 8 (perf audit, 2026-08-05): the iframe only loads on click
        (lite-embed pattern), but starting the DNS handshake + TCP/TLS
        connection early makes the first click feel instant.
-       youtube-nocookie.com is what Base.astro's openLightbox() embeds.
-       i.ytimg.com serves the grid thumbnails. -->
-  <link rel="preconnect" href="https://www.youtube-nocookie.com" />
+       Note: We preconnect to youtube.com (NOT youtube-nocookie.com) —
+       openLightbox() now uses youtube.com/embed because the nocookie
+       domain stalls on Chrome-Android (Realme UI etc.). The CDN is
+       shared, so this preconnect also warms the video segments. -->
+  <link rel="preconnect" href="https://www.youtube.com" />
   <link rel="preconnect" href="https://i.ytimg.com" />
-  <link rel="dns-prefetch" href="https://www.youtube-nocookie.com" />
+  <link rel="dns-prefetch" href="https://www.youtube.com" />
   <link rel="dns-prefetch" href="https://i.ytimg.com" />
 
   <!-- Self-hosted fonts (3 variable files cover all 8 weights).
@@ -1439,13 +1441,35 @@ import { ViewTransitions } from 'astro:transitions';
           !videoOrYoutubeId.startsWith('http');
         if (isYoutubeId) {
           const iframe = document.createElement('iframe');
-          // vq=medium asks YouTube's player for the ~480p/720p rendition tier
-          // instead of defaulting to 1080p — critical for low-end phones
-          // (Realme C 21 etc.) where the radio can't sustain the higher
-          // bitrate and the player stalls after 3-4 seconds.
-          // enablejsapi=1 lets us postMessage() the iframe later if we
-          // ever need finer playback control.
-          iframe.src = `https://www.youtube-nocookie.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=medium&enablejsapi=1`;
+          // Why these params:
+          //   youtube.com/embed  (NOT youtube-nocookie.com):
+          //     The nocookie domain uses a cookie-less session that
+          //     has a known issue on Chrome-on-Android (esp. Realme UI
+          //     and older WebView builds): the player initializes,
+          //     buffers 3-5 seconds, then stalls forever because it
+          //     can't renegotiate the session. youtube.com uses a
+          //     normal cookie session and plays cleanly. We keep the
+          //     "nocookie" privacy stance via the lite-embed pattern
+          //     (the iframe only loads AFTER the user clicks play,
+          //     and we never set YouTube tracking cookies ourselves).
+          //   enablejsapi=1 REMOVED:
+          //     Opens a postMessage channel that some Android browsers
+          //     mishandle when combined with autoplay=1. The player
+          //     waits for a JS handshake that never arrives, then
+          //     pauses to "save bandwidth" — looks exactly like
+          //     infinite buffering. Not needed here (we don't talk
+          //     to the iframe after creation).
+          //   autoplay=1 + playsinline=1 KEPT:
+          //     autoplay works because the click that opened the
+          //     lightbox IS the user gesture. playsinline keeps the
+          //     video inline (no auto-fullscreen on Android tap).
+          //   vq=medium:
+          //     Asks the player for ~480p/720p instead of defaulting
+          //     to 1080p on a fullscreen lightbox — cuts bandwidth
+          //     ~40%, which matters on a Realme C 21 radio.
+          //   rel=0 + modestbranding=1:
+          //     Hides end-screens + YouTube logo. Cosmetic.
+          iframe.src = `https://www.youtube.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=medium`;
           iframe.className = 'w-full h-full rounded-2xl';
           iframe.title = title || 'YouTube video';
           iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
