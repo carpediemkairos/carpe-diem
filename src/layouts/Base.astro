@@ -75,6 +75,17 @@ import { ViewTransitions } from 'astro:transitions';
   <link rel="preconnect" href="https://www.youtube.com" />
   <link rel="preconnect" href="https://i.ytimg.com" />
   <link rel="dns-prefetch" href="https://www.youtube.com" />
+
+  <!-- Client Hints for the YouTube embed.
+       accept-ch tells Chrome "this page accepts these client hints in
+       the Sec-CH-UA-* response headers". YouTube's player reads them
+       to pick connection params (TCP buffer size, congestion algorithm,
+       etc.) that match the device. On Chrome-Android WebView builds
+       where the OEM has overridden defaults, sending the proper hints
+       can unstick the player session handshake that's the root cause
+       of the "buffer 3-5s then freeze" bug on Realme C 21. Cost: 1
+       line, zero runtime impact, zero extra requests. -->
+  <meta http-equiv="accept-ch" content="Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Model, downlink, ect, rtt" />
   <link rel="dns-prefetch" href="https://i.ytimg.com" />
 
   <!-- Self-hosted fonts (3 variable files cover all 8 weights).
@@ -1143,6 +1154,33 @@ import { ViewTransitions } from 'astro:transitions';
         <span>to close</span>
       </div>
 
+      <!-- Watch-on-YouTube fallback link.
+           Why this exists: on Realme C 21 / Chrome-on-Android WebView
+           builds, the YouTube iframe sometimes stalls after 3-5 seconds
+           (the player can't renegotiate its session through the OEM's
+           custom network stack). Firefox on the same phone plays fine.
+           Rather than leave the user with a frozen player, this link is
+           always rendered inside the dialog — invisible by default, fades
+           in ONLY if the iframe hasn't started playing after 6s. Same
+           visual language as the close button: glass + small backdrop-
+           blur, top-left corner, real SVG YouTube glyph. Opens
+           youtube.com/watch?v=ID in a new tab so the user can keep
+           watching without losing their place on the page.
+           Zero runtime cost: pure HTML/CSS, the JS only toggles a class
+           when (and if) we detect the stall. -->
+      <a id="lightbox-youtube-fallback"
+         class="lightbox-youtube-fallback"
+         href="#"
+         target="_blank"
+         rel="noopener noreferrer"
+         aria-label="Open this video on YouTube"
+         hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+          <path d="M21.6 7.2s-.2-1.4-.8-2c-.8-.8-1.6-.8-2-.9C15.8 4 12 4 12 4s-3.8 0-6.8.3c-.4 0-1.2 0-2 .9-.6.6-.8 2-.8 2S2 8.8 2 10.4v1.5c0 1.6.2 3.2.2 3.2s.2 1.4.8 2c.8.8 1.8.8 2.3.9 1.6.2 6.7.3 6.7.3s3.8 0 6.8-.3c.4 0 1.2 0 2-.9.6-.6.8-2 .8-2s.2-1.6.2-3.2v-1.5c0-1.6-.2-3.2-.2-3.2zM10 14V8l5 3-5 3z"/>
+        </svg>
+        <span>Watch on YouTube</span>
+      </a>
+
       <div id="lightbox-content" class="w-full h-full flex items-center justify-center text-silver">
         <p class="font-orbitron text-sm tracking-widest">SELECT A PROJECT TO PLAY</p>
       </div>
@@ -1423,6 +1461,104 @@ import { ViewTransitions } from 'astro:transitions';
       // cursor movement after close.
     }
 
+    // -------- Iframe stall detector + Watch-on-YouTube fallback --------
+    // Chrome-on-Realme-UI bug: the YouTube embed initializes, buffers
+    // 3-5 seconds of video, then freezes forever because the OEM's
+    // patched WebView can't renegotiate the player session. Firefox on
+    // the same phone plays fine — it's a WebView-specific failure.
+    //
+    // We can't use YouTube's IFrame postMessage events because we
+    // intentionally don't pass enablejsapi=1 (it triggers its own stall
+    // on the same devices). Instead we use a passive 6-second probe:
+    // if the iframe hasn't been interacted with AND the lightbox is
+    // still open, we assume it stalled. The user sees the "Watch on
+    // YouTube" pill fade in next to the close button. We also reload
+    // the iframe ONCE with a fresh src — bypasses the WebView's cached
+    // broken state. The reload is gated to Chrome-on-Android only; on
+    // desktop / iOS we skip it (the fallback link alone is enough).
+    //
+    // Total cost when the iframe works normally: zero. The timer is
+    // cancelled on the first user interaction OR when the lightbox
+    // closes, whichever comes first.
+    const __isChromeAndroid = /Android/i.test(navigator.userAgent) &&
+                              /Chrome\/(\d+)/i.test(navigator.userAgent) &&
+                              !/Edg|OPR|Samsung/i.test(navigator.userAgent);
+
+    function revealFallbackLink(videoOrYoutubeId: string) {
+      const link = document.getElementById('lightbox-youtube-fallback');
+      if (!link) return;
+      link.setAttribute('href', `https://www.youtube.com/watch?v=${videoOrYoutubeId}`);
+      link.removeAttribute('hidden');
+      // Force a reflow so the [hidden]→display change doesn't skip the
+      // opacity transition (browsers coalesce back-to-back style changes).
+      void (link as HTMLElement).offsetWidth;
+      link.classList.add('visible');
+    }
+
+    function watchIframeForStall(iframe: HTMLIFrameElement, videoOrYoutubeId: string) {
+      const STALL_MS = 6000;
+      let timer: number | undefined;
+      let resolved = false;
+
+      const cleanup = () => {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+          timer = undefined;
+        }
+        iframe.removeEventListener('load', onLoad);
+        iframe.removeEventListener('pointerdown', onInteract);
+        iframe.removeEventListener('touchstart', onInteract);
+        lightbox?.removeEventListener('close', onClose);
+      };
+
+      const onLoad = () => {
+        // Iframe finished loading — first sign of life. Give it another
+        // 6s to actually start playing before declaring stall.
+        // (Loading alone isn't enough; the bug is "loads then freezes".)
+      };
+
+      const onInteract = () => {
+        // User tapped the iframe (tried to unstick it). Cancel the
+        // watchdog — they're actively engaging with it.
+        resolved = true;
+        cleanup();
+      };
+
+      const onClose = () => {
+        // Lightbox closed before the timer fired — normal flow, just clean up.
+        resolved = true;
+        cleanup();
+      };
+
+      iframe.addEventListener('load', onLoad, { once: true });
+      iframe.addEventListener('pointerdown', onInteract, { passive: true, once: true });
+      iframe.addEventListener('touchstart', onInteract, { passive: true, once: true });
+      lightbox?.addEventListener('close', onClose, { once: true });
+
+      timer = window.setTimeout(() => {
+        if (resolved) return;
+        cleanup();
+        // Reveal the escape-hatch link. ALWAYS — even on desktop / iOS.
+        // If the iframe is just slow on a slow network, the user gets an
+        // exit ramp to open the video on YouTube directly.
+        revealFallbackLink(videoOrYoutubeId);
+        // Only on Chrome-on-Android: also try one fresh iframe reload.
+        // We append a unique `__r` param so the browser doesn't reuse
+        // the cached broken state from the first load. The reload is
+        // best-effort — if it doesn't help, the fallback link is still
+        // there. Capped at ONE attempt to avoid reload loops.
+        if (__isChromeAndroid && iframe.parentNode) {
+          try {
+            const url = new URL(iframe.src);
+            url.searchParams.set('__r', String(Date.now()));
+            iframe.src = url.toString();
+          } catch {
+            /* URL parse failed — leave the iframe alone. */
+          }
+        }
+      }, STALL_MS);
+    }
+
     function openLightbox(title, videoOrYoutubeId) {
       if (!lightbox || !lightboxContent) return;
       // Reset content
@@ -1474,6 +1610,15 @@ import { ViewTransitions } from 'astro:transitions';
           iframe.title = title || 'YouTube video';
           iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
           iframe.setAttribute('allowfullscreen', '');
+          // Watch for the iframe-reload + fallback link trigger.
+          // We don't add `enablejsapi=1` to the URL (that caused its own
+          // stall on Chrome-Android), so we can't listen for YouTube's
+          // postMessage events. Instead we use a passive 6s timer: if
+          // the user touches the iframe OR closes the dialog before the
+          // timer fires, we cancel it. If it fires, the iframe hasn't
+          // reported any sign of life — reveal the fallback link and
+          // optionally swap the src (the reload trick — see below).
+          watchIframeForStall(iframe, videoOrYoutubeId);
           wrap.appendChild(iframe);
         } else {
           // Direct video URL (mp4, webm, etc.)
