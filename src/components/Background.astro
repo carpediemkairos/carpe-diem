@@ -33,7 +33,16 @@
     // The CSS background layers (bg-gradient-aurora, bg-grid, bg-grid-fine,
     // bg-scanlines, bg-noise) still render, so the page isn't blank — just
     // no 3D parallax. Added 2026-08-04 as Step 4 of the perf audit.
-    if (isMobile || isTablet) return;
+    //
+    // Also skip on .budget-classified devices (Realme C 21, Save-Data,
+    // weak Android) — the inline detector in Base.astro flags the same
+    // Realme C 21 we already catch via `isMobile`, but this gives us
+    // defense-in-depth for any future budget device that doesn't trip
+    // the user-agent regexes. Critical for video playback: a spinning
+    // WebGL canvas can steal 8-12% of CPU even when idle, and the
+    // YouTube player in the lightbox needs every cycle it can get.
+    const isBudget = document.documentElement.classList.contains('budget');
+    if (isMobile || isTablet || isBudget) return;
     const isLowPower = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
     const antialias = !isMobile && !isTablet;
     const shapeCount = isMobile ? 5 : (isTablet ? 7 : (isLowPower ? 8 : 12));

@@ -169,7 +169,10 @@ const thumbUrl = videoId
     // Fallback only — Base.astro's script hasn't run yet. Swap inline
     // so the click is never dead. The iframe is sized to fill the card.
     const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+    // vq=medium asks for ~480p/720p instead of 1080p — same reasoning as
+    // Base.astro's openLightbox(): low-end phones (Realme C 21 etc.)
+    // can't sustain the higher bitrate and stall after a few seconds.
+    iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=medium&enablejsapi=1`;
     iframe.title = title;
     iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');

@@ -1260,6 +1260,11 @@ import { ViewTransitions } from 'astro:transitions';
       };
       const schedule = () => {
         if (rafScheduled) return;
+        // pauseForPlayback gate: while the video lightbox is open we don't
+        // want this loop consuming any CPU at all — let the video decoder
+        // have it. mousemove still fires (so the dirty flags stay set), and
+        // the loop resumes the moment the user closes the dialog.
+        if ((window as any).__pauseForPlayback) return;
         rafScheduled = true;
         requestAnimationFrame(flush);
       };
@@ -1374,6 +1379,48 @@ import { ViewTransitions } from 'astro:transitions';
     const lightboxContent = document.getElementById('lightbox-content');
     const lightboxClose = document.getElementById('lightbox-close');
 
+    // -------- Page-pause / page-resume (video playback perf) --------
+    // While the video lightbox is open, pause every CSS animation AND
+    // the tilt/magnet RAF loop on the rest of the page. The video
+    // decoder needs the CPU/GPU to itself — without this, on a Realme
+    // C 21 the conic border spin + badge pulse + 3D tilt + background
+    // gradients eat enough budget that YouTube stalls and re-buffers
+    // every ~4 seconds.
+    //
+    // We collect the animations once, pause them, then resume the same
+    // set on close. Skips any element inside the dialog (the iframe
+    // itself, the close button, the "Esc to close" hint) so the player's
+    // own UI keeps animating normally.
+    const __pausedAnimations: Animation[] = [];
+    function pausePageForPlayback() {
+      if ((window as any).__pauseForPlayback) return;
+      (window as any).__pauseForPlayback = true;
+      document.querySelectorAll('body *').forEach((el) => {
+        if (lightbox && lightbox.contains(el)) return;
+        const anims = (el as any).getAnimations?.({ subtree: true });
+        if (!anims) return;
+        for (const a of anims) {
+          if (a.playState === 'running') {
+            a.pause();
+            __pausedAnimations.push(a);
+          }
+        }
+      });
+    }
+    function resumePageAfterPlayback() {
+      if (!(window as any).__pauseForPlayback) return;
+      (window as any).__pauseForPlayback = false;
+      for (const a of __pausedAnimations) {
+        if (a.playState === 'paused') a.play();
+      }
+      __pausedAnimations.length = 0;
+      // Kick the tilt/magnet loop back into life if the cursor was over
+      // a card right before the dialog opened — dirty flags were set,
+      // schedule() was just short-circuiting. One mousemove isn't needed
+      // because the global mousemove listener will fire on the first
+      // cursor movement after close.
+    }
+
     function openLightbox(title, videoOrYoutubeId) {
       if (!lightbox || !lightboxContent) return;
       // Reset content
@@ -1392,7 +1439,13 @@ import { ViewTransitions } from 'astro:transitions';
           !videoOrYoutubeId.startsWith('http');
         if (isYoutubeId) {
           const iframe = document.createElement('iframe');
-          iframe.src = `https://www.youtube-nocookie.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+          // vq=medium asks YouTube's player for the ~480p/720p rendition tier
+          // instead of defaulting to 1080p — critical for low-end phones
+          // (Realme C 21 etc.) where the radio can't sustain the higher
+          // bitrate and the player stalls after 3-4 seconds.
+          // enablejsapi=1 lets us postMessage() the iframe later if we
+          // ever need finer playback control.
+          iframe.src = `https://www.youtube-nocookie.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=medium&enablejsapi=1`;
           iframe.className = 'w-full h-full rounded-2xl';
           iframe.title = title || 'YouTube video';
           iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
@@ -1421,6 +1474,12 @@ import { ViewTransitions } from 'astro:transitions';
       // click-outside-to-close, and ARIA for free.
       lightbox.showModal();
       document.body.style.overflow = 'hidden';
+      // Pause every page-level CSS animation + the tilt/magnet RAF loop
+      // so the GPU/CPU is free for the video decoder. Critical on low-end
+      // phones (Realme C 21, etc.) — without this, the conic border spin,
+      // badge pulse, profile ring, and 3D tilt eat enough CPU that
+      // YouTube's player stalls and the video re-buffers every ~4s.
+      pausePageForPlayback();
     }
 
     function closeLightbox() {
@@ -1432,6 +1491,8 @@ import { ViewTransitions } from 'astro:transitions';
       // CLOSE — native <dialog> (Step 14). Restores focus + body scroll.
       lightbox.close();
       document.body.style.overflow = '';
+      // Resume everything we paused when the lightbox opened.
+      resumePageAfterPlayback();
     }
 
     // Expose for React / other components
