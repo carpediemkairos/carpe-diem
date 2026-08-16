@@ -1607,15 +1607,38 @@ import { ViewTransitions } from 'astro:transitions';
     // while the muted video plays, and the rail has a dot indicator that
     // highlights the tile currently snapped into view. Both are gated on
     // viewport width so desktop code paths are unaffected.
+    //
+    // Step 11 (lite-mode pass): on low-end small devices the progress
+    // bar RAF loop is skipped. It's pure decoration (a fake 8s fill
+    // cycle on a static thumbnail), and requestAnimationFrame ticks at
+    // 60Hz on a class with a CSS transition on width — every tick
+    // schedules a paint even when the value only changed by 0.02%.
+    // The cover card stays as a static thumbnail + play button.
+    //
+    // "Low-end small device" = the .budget class on <html>, set by the
+    // inline detector in Base.astro for weak Android (≤4 cores AND ≤2GB
+    // RAM), Save-Data users, and known budget UAs (Realme C, Redmi A,
+    // Samsung A0x). Mid-range phones (Pixel 7a, Galaxy A5x, etc.) keep
+    // the bar because they can afford the paint cost.
     (() => {
       const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
       if (!isMobile()) return;
+      // .budget is set on <html> for weak Android / Save-Data / known
+      // budget UAs. Skip the RAF loop there; mid-range phones fall
+      // through to the normal animation.
+      const isBudget = document.documentElement.classList.contains('budget');
 
       // --- Progress bar for the cover card ---
       // The video is muted/looped with no audio; we use a fake 8s cycle so
       // the bar fills smoothly and resets — matching the perceived pacing
       // of a cinematic teaser without depending on the (currently empty)
       // video src.
+      //
+      // On .budget devices, skip the RAF entirely — the cover card just
+      // shows a static thumbnail. The fill div stays at its CSS default
+      // (width: 0) and never animates, so the GPU/CPU is free for the
+      // video decoder if the user taps play.
+      if (isBudget) return;
       const cover = document.querySelector('.video-card--cover');
       const fill = cover?.querySelector('.video-card__progress-fill');
       if (cover && fill) {
