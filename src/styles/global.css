@@ -1834,9 +1834,12 @@ textarea.form-input { min-height: 120px; }
    page behind the dialog.
 
    Layout rules below:
-     - #lightbox[open] is the centered dialog box (max 1024 wide, 16:9 capped)
+     - #lightbox[open] is the centered dialog box
      - .lightbox-frame is the inner 16:9 video area
-     - #lightbox-close is positioned relative to the dialog (not viewport)
+     - #lightbox-close is a compact 32px button at the top-right of the
+       frame, sized + positioned to sit in the dead space above
+       YouTube's own player controls (⚙ / CC / theater) at the
+       iframe's top-right — not on top of them
      - .video-card--yt hides the redundant .video-card__play SVG stack */
 #lightbox {
     background: transparent;
@@ -1866,7 +1869,12 @@ textarea.form-input { min-height: 120px; }
 }
 
 #lightbox::backdrop {
-    background: rgba(0, 0, 0, 0.85);
+    /* Fully opaque black — the blurred 85% version let the page's
+       cyan/purple gradients bleed through the lightbox frame's
+       rounded corner cut-outs, producing a subtle greenish tint at
+       the corners against the frame's pure-black interior. With 100%
+       opacity the corners show pure black and match the frame. */
+    background: #000;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
 }
@@ -1875,11 +1883,18 @@ textarea.form-input { min-height: 120px; }
    this frame picks a width that fits both the viewport width AND the
    viewport height at 16:9 (so on a short phone in landscape, the height
    is the limiting factor, not the width — and the video stays 16:9).
-   aspect-ratio: 16/9 then derives the height automatically. */
+   aspect-ratio: 16/9 then derives the height automatically.
+
+   background is pure black (not var(--deep)). The iframe is a square
+   16:9; the parent's overflow:hidden + border-radius clips the
+   square corners into a rounded shape, leaving 4 tiny corner regions
+   that show the frame's background. YouTube's player is pure black,
+   so the corners blend with the video's own black bars / loading
+   state — with var(--deep) (#0a0a14) the corners had a subtle blue
+   tint that was visible against YouTube's #000. */
 .lightbox-frame {
     position: relative;
-    /* Safe margins: 1rem on each side, no extra vertical allowance —
-       the close button now lives INSIDE the frame, not above it. */
+    /* Safe margins: 1rem on each side, no extra vertical allowance. */
     width: min(
         calc(100vw - 2rem),
         calc(100vh * 16 / 9 - 2rem),
@@ -1888,8 +1903,12 @@ textarea.form-input { min-height: 120px; }
     aspect-ratio: 16 / 9;
     border-radius: 1rem;
     overflow: hidden;
-    background: var(--deep);
-    border: 1px solid var(--glass-border);
+    background: #000;
+    /* No border — a 1px white border on a rounded corner renders with
+       subpixel antialiasing that looks jagged/rough against the
+       smooth box-shadow glow. The shadow already defines the frame's
+       edge; the border was redundant and made the curve look less
+       smooth. */
     box-shadow:
         0 25px 60px -15px rgba(0, 0, 0, 0.7),
         0 0 60px rgba(0, 242, 254, 0.18),
@@ -1897,27 +1916,46 @@ textarea.form-input { min-height: 120px; }
 }
 
 /* ============================================================
-   LIGHTBOX CLOSE BUTTON — in-frame (YouTube / Vimeo pattern)
+   LIGHTBOX CLOSE BUTTON — in-frame, top-right, compact
    ============================================================
-   44×44 hit target (WCAG 2.5.5), real SVG X icon, glass + backdrop-blur
-   over the video, cyan→purple gradient ring + glow on hover. The .idle
-   class is added by JS after 4s of mouse inactivity on desktop to fade
-   the button out — it returns instantly on any mouse move. Mobile keeps
-   the button always visible (no hover state on touch). */
+   32×32 hit target (smaller than the original 44 — the 44 was so big
+   it covered YouTube's own player controls). Real SVG X icon (14px),
+   glass + backdrop-blur, cyan→purple gradient ring + glow on hover.
+   The .idle class is added by JS after 4s of mouse inactivity on
+   desktop to fade the button out — it returns instantly on any mouse
+   move. Mobile keeps the button always visible (no hover state on
+   touch).
+
+   Why compact and not the original 44px: YouTube's player UI puts
+   the Settings (⚙) gear, CC, and theater-mode buttons in the top-
+   right of the iframe. A 44px close button at the same corner covered
+   them — clicking YouTube's settings was a coin flip between "open
+   settings" and "close the modal". A 32px close button at the very
+   top-right corner of the frame sits NEXT TO YouTube's controls in
+   the dead space they leave at the very top of the iframe (above
+   the ⚙ row), not on top of them. The two UIs now occupy the same
+   corner but different vertical bands.
+   ============================================================ */
 .lightbox-close {
     position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
+    top: 0.5rem;
+    right: 0.5rem;
     z-index: 2;
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.18);
-    background: rgba(5, 5, 12, 0.55);
+    /* Background uses pure black (not var(--deep) at 55%) to blend
+       seamlessly with the YouTube player's #000 background. With the
+       blue-tinted rgba(5,5,12,0.55) the button created a visible
+       glass patch at the top-right corner of the frame against the
+       pure-black video — the tint was subtle but noticeable at the
+       corner. */
+    background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(14px) saturate(180%);
     -webkit-backdrop-filter: blur(14px) saturate(180%);
     color: #ffffff;
@@ -2132,23 +2170,15 @@ textarea.form-input { min-height: 120px; }
 }
 
 @media (max-width: 640px) {
-    /* Tighter safe margins on phones; close button stays the same size */
+    /* Tighter safe margins on phones; close button stays at 32px
+       (compact by design — was 44px before, which covered YouTube's
+       own player controls at the iframe's top-right). */
     .lightbox-frame {
         width: min(
             calc(100vw - 1.5rem),
             calc(100vh * 16 / 9 - 1.5rem),
             1024px
         );
-    }
-    .lightbox-close {
-        top: 0.5rem;
-        right: 0.5rem;
-        width: 40px;
-        height: 40px;
-    }
-    .lightbox-close svg {
-        width: 18px;
-        height: 18px;
     }
 }
 

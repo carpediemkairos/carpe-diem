@@ -1133,16 +1133,18 @@ import { ViewTransitions } from 'astro:transitions';
        rules in global.css. -->
   <dialog id="lightbox" class="bg-transparent p-0 m-0 max-w-none max-h-none" aria-label="Video player">
     <div class="lightbox-frame">
-      <!-- Close button: sits inside the video frame, top-right corner.
-           Anchors the "X" to the player itself (the natural place users
-           look for close on a video player — YouTube / Vimeo pattern)
-           instead of floating in dead space above the dialog.
-           Real SVG X icon, glass + backdrop-blur over the video, gradient
-           ring + glow on hover. CSS handles hover/focus; JS auto-hides
-           after 4s of mouse inactivity on desktop (mobile keeps it
-           always visible because there's no hover state on touch). -->
+      <!-- Close button: small, anchored to the top-right of the frame.
+           Sized + positioned to sit in the dead space ABOVE YouTube's
+           own player controls (⚙ Settings / CC / theater mode) at the
+           very top-right of the iframe — not on top of them. The two
+           UIs now occupy different vertical bands of the same corner
+           instead of stacking on the same pixels. Real SVG X icon,
+           glass + backdrop-blur, gradient ring + glow on hover. CSS
+           handles hover/focus; JS auto-hides after 4s of mouse
+           inactivity on desktop (mobile keeps it always visible
+           because there's no hover state on touch). -->
       <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close video player">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="6" y1="6" x2="18" y2="18"></line>
           <line x1="18" y1="6" x2="6" y2="18"></line>
         </svg>
@@ -1500,7 +1502,23 @@ import { ViewTransitions } from 'astro:transitions';
           //   rel=0 + modestbranding=1:
           //     Hides end-screens + YouTube logo. Cosmetic.
           iframe.src = `https://www.youtube.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=small`;
-          iframe.className = 'w-full h-full rounded-2xl';
+          // No border-radius on the iframe on purpose. The parent
+          // .lightbox-frame has overflow: hidden + border-radius: 1rem
+          // which clips the iframe to the frame's rounded shape. Adding
+          // a border-radius directly on the iframe is unreliable —
+          // Chrome inconsistently honors border-radius on replaced
+          // elements (iframes), and when it does honor it, the curve
+          // can be 1-2px outside the frame's clip (because the frame's
+          // 1px border eats into the inner radius), leaving the
+          // iframe's corners peeking out past the frame's curve.
+          //
+          // background: #000 set explicitly to match the frame. Some
+          // browsers render iframes with a white default background
+          // before the embedded page paints — that white would show
+          // through any transparent areas of YouTube's page and create
+          // a visible color edge at the rounded corner clip.
+          iframe.className = 'w-full h-full';
+          iframe.style.background = '#000';
           iframe.title = title || 'YouTube video';
           iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
           iframe.setAttribute('allowfullscreen', '');
@@ -1508,7 +1526,12 @@ import { ViewTransitions } from 'astro:transitions';
         } else {
           // Direct video URL (mp4, webm, etc.)
           const v = document.createElement('video');
-          v.className = 'w-full h-full object-cover rounded-2xl';
+          // No border-radius on the video — the parent .lightbox-frame
+          // clips to its own 1rem curve. Same reason as the iframe above.
+          // background: #000 matches the frame so any transparent areas
+          // blend seamlessly.
+          v.className = 'w-full h-full object-cover';
+          v.style.background = '#000';
           v.src = videoOrYoutubeId;
           v.controls = true;
           v.autoplay = true;
