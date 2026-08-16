@@ -2358,6 +2358,23 @@ footer h4 {
     .navbar-aurora { animation: none !important; }
 }
 
+/* ---- Step 9: kill the fixed background layer animations on mobile. ----
+   The site's "cinematic" background is four full-viewport fixed layers
+   behind everything: .bg-gradient-aurora (30s rotate + 18s drift, with
+   filter: blur(70px) saturate(160%) on top), .bg-grid (40s translate),
+   and .bg-grid-fine (60s translate-reverse). All four paint every
+   frame, regardless of where the user has scrolled — the Intersection
+   Observer pause doesn't help because they're position: fixed, not in
+   a scrollable container. The aurora alone (a full-viewport blur
+   re-rasterized every 16ms) is one of the heaviest single paint costs
+   on the page. The layers still render, the grid lines and dark
+   gradient still show — they just stop moving. */
+@media (max-width: 640px) {
+    .bg-gradient-aurora { animation: none !important; }
+    .bg-grid            { animation: none !important; }
+    .bg-grid-fine       { animation: none !important; }
+}
+
 /* ---- Step 2: stop the showreel featured-card conic border spin. ----
    The featured video card's rainbow ring is built from a conic-gradient
    masked with a 2px cutout, then rotated 360° every 8s. That is one of
