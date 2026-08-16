@@ -1199,16 +1199,19 @@ import { ViewTransitions } from 'astro:transitions';
     // mousemove handler just marks elements dirty and schedules one frame.
     // Visual behavior is identical — only the execution model changed.
     //
-    // Step 8 (mobile-perf pass): on phones the whole block is skipped.
-    // There is no cursor to track on a touch device, but the listeners
-    // still register and the document-level mousemove handler at the
-    // bottom of this block fires on touchmove / scroll / synthetic
-    // WebView events on some Android builds — each fire schedules an
-    // empty RAF pass that competes with the YouTube decoder. The
-    // `isMobile` width matches the @media (max-width: 640px) gate
-    // used by the rest of the lite-mode pass.
-    const isMobile = window.matchMedia('(max-width: 640px)').matches;
-    if (!reduceMotion && !isMobile) {
+    // Effect is gated on (pointer: fine) so it ONLY runs on devices with
+    // a real cursor (desktop, laptops with trackpad). Touch-primary
+    // devices — phones, tablets, 2-in-1s in tablet mode — skip the
+    // whole block. There is no cursor to track on touch, the listeners
+    // would just be overhead, and the document-level mousemove handler
+    // at the bottom of this block fires on touchmove / scroll / synthetic
+    // WebView events on some Android builds. (pointer: fine) is the
+    // correct signal here, not a width check — a 1024px tablet in
+    // landscape reports (pointer: coarse) and stays excluded, while a
+    // 13" laptop with a trackpad reports (pointer: fine) and gets the
+    // effect.
+    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+    if (!reduceMotion && hasFinePointer) {
       // Collect every element that needs per-frame transform updates.
       // Each entry: { el, type, max, dirty, reset }
       const animated = [];
