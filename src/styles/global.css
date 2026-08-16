@@ -1608,7 +1608,11 @@ a.badge-card:hover .badge-icon {
 
 .portfolio-thumb {
     position: relative;
-    aspect-ratio: 16 / 10;
+    /* 16/9 matches the YouTube mqdefault.jpg (320×180) used by PortfolioGrid.astro.
+       The earlier hqdefault.jpg (480×360) had black letterbox bars baked in,
+       which made the card look like it had empty space at the top even when
+       the image filled the frame. mqdefault.jpg is true 16:9 with no bars. */
+    aspect-ratio: 16 / 9;
     overflow: hidden;
     background: var(--deep);
 }

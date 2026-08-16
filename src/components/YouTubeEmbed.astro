@@ -16,15 +16,28 @@ interface Props {
   // Optional: render in compact mode (smaller play button). Useful for
   // tight grids; matches the existing .portfolio-thumb aspect ratio.
   compact?: boolean;
+  // Optional: pick the YouTube thumbnail variant. The Cinematic Showreel's
+  // featured card needs the full-resolution 1280×720 cover (it's ~1100px
+  // wide on desktop and would look soft with mqdefault). Secondary cards
+  // (~560px wide) are fine on mqdefault — half the bytes, same visual.
+  //   'high' (default) → maxresdefault.jpg  (1280×720, ~231 KB)
+  //   'low'            → mqdefault.jpg      (320×180,  ~23 KB)
+  // YouTube returns a 120×90 placeholder when maxres isn't available, so
+  // 'high' degrades gracefully to the same image 'low' would have served.
+  resolution?: 'high' | 'low';
 }
 
-const { videoId = '', title = 'YouTube video', compact = false } = Astro.props;
+const {
+  videoId = '',
+  title = 'YouTube video',
+  compact = false,
+  resolution = 'high',
+} = Astro.props;
 
 // YouTube thumbnail URL. We use maxresdefault for the cover image
-// (1280x720). YouTube returns a 120x90 placeholder if maxres isn't
-// available, so we keep the URL simple — ~30 KB per thumbnail.
+// (1280x720) and mqdefault for compact secondary cards (320x180).
 const thumbUrl = videoId
-  ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
+  ? `https://i.ytimg.com/vi/${videoId}/${resolution === 'low' ? 'mqdefault' : 'maxresdefault'}.jpg`
   : '';
 ---
 
@@ -67,9 +80,22 @@ const thumbUrl = videoId
     display: block;
     width: 100%;
     height: 100%;
-    aspect-ratio: 16 / 9;
+    /* No aspect-ratio here on purpose. The parent .video-card / .portfolio-thumb
+       always provides the aspect ratio. If we set 16/9 on the embed too, the
+       embed's height is fixed by its width (16/9 of width), and when the
+       parent has a different ratio (e.g. 16/10 in the portfolio grid) the
+       browser centers the embed vertically — leaving empty space at the top
+       and bottom.
+
+       background-size: cover (not 100% 100%) preserves the 16:9 native
+       aspect ratio of the YouTube thumbnail. With 100% 100% the image
+       stretched to the parent box, which on non-16:9 cards (the showreel
+       secondary tiles are wider than 16/9 in the 2-col desktop grid and
+       slightly taller on the mobile 2-col grid) horizontally squashed
+       faces and text. cover crops a few pixels instead — never warps. */
     background-size: cover;
     background-position: center;
+    background-repeat: no-repeat;
     background-color: #0a0a14;
     border: 0;
     padding: 0;

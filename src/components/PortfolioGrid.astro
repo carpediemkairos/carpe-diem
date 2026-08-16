@@ -31,15 +31,15 @@ function renderCardHtml(item: CollectionEntry<'projects'>, i: number): string {
   const video = item.data.video || '';
   const desc = item.data.desc;
   const tags = item.data.tags;
-  // Grid thumbnails use hqdefault.jpg (480×360, ~15-25 KB) instead of
-  // maxresdefault.jpg (1280×720, ~80-150 KB). Card surface is small
-  // (~400 px wide) so the higher-res variant provides no visible win
-  // and adds ~5× the bytes. The lightbox plays the iframe directly,
-  // so the full-quality thumbnail isn't needed for click-to-play.
-  // Step 8 (perf audit, 2026-08-05) — confirmed hqdefault as the
-  // grid-card variant. Switch to maxres only for the cover/feature card.
+  // Grid thumbnails use mqdefault.jpg (320×180, ~20 KB) — true 16:9, no bars.
+  // The earlier hqdefault.jpg (480×360) had black letterbox bars baked into the
+  // 4:3 frame around the 16:9 video content, which made the card look like it
+  // had empty space at the top even when the image filled the frame. mqdefault
+  // is also lighter than hqdefault (~20 KB vs ~45 KB) and matches the 16:9 card
+  // aspect ratio in global.css. The lightbox plays the iframe directly, so
+  // maxresdefault (1280×720) isn't needed for click-to-play.
   const thumbUrl = youtubeId
-    ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`
+    ? `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`
     : '';
 
   // Tags HTML
@@ -61,7 +61,7 @@ function renderCardHtml(item: CollectionEntry<'projects'>, i: number): string {
   //   correctly. Without cover, the intrinsic 1280×720 image would
   //   render at top-left of the card and only show a quadrant.
   const thumbHtml = youtubeId
-    ? `<button type="button" class="yt-embed" data-yt-id="${youtubeId}" data-yt-title="${title}" aria-label="Play ${title} on YouTube"><img src="${thumbUrl}" alt="${title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" /><span class="yt-embed__play" aria-hidden="true"><svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#f00"/><path d="M45 24 27 14v20" fill="#fff"/></svg></span></button>`
+    ? `<button type="button" class="yt-embed" data-yt-id="${youtubeId}" data-yt-title="${title}" aria-label="Play ${title} on YouTube"><img src="${thumbUrl}" alt="${title}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block" /><span class="yt-embed__play" aria-hidden="true"><svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#f00"/><path d="M45 24 27 14v20" fill="#fff"/></svg></span></button>`
     : `<div class="yt-placeholder" aria-label="${title} — video coming soon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none"/></svg><span class="yt-placeholder__label">Video coming soon</span></div>`;
 
   // Escape attributes that go into HTML
