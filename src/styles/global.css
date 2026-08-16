@@ -2426,20 +2426,81 @@ footer h4 {
         background: rgba(6, 4, 18, 0.92) !important;
     }
 
-    /* Badge cards in the hero — was rgba(15,15,25,0.4) + blur(16px). */
+    /* Badge cards in the hero — was rgba(15,15,25,0.4) + blur(16px).
+       Match the desktop look without re-adding the blur.
+       On desktop, blur(16px) tints the panel with whatever is behind it
+       and softens the border. On mobile we can't blur, so we strengthen
+       the border + drop shadow + inset highlight so the panel still
+       reads as the same frosted card. */
     .badge-card {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         background:
-            linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 50%, rgba(255,255,255,0.03) 100%),
-            rgba(10, 8, 26, 0.88) !important;
+            linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 50%, rgba(255,255,255,0.04) 100%),
+            var(--glass-bg) !important;
+        border-color: rgba(255, 255, 255, 0.16) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.10),
+            0 2px 8px rgba(0, 0, 0, 0.25) !important;
     }
 
-    /* Secondary "Hire Me" / glass button — blur(20px). */
+    /* Deep Work Showcase filter tabs (.cat-tab + .sub-filter).
+       Same recipe as .badge-card: drop the blur, keep the panel +
+       strengthen the border + collapse the 3-layer shadow into 2 so
+       the cards still read as glass. The ::before shine-sweep stays
+       (only animates on hover, no idle cost). */
+    .cat-tab,
+    .sub-filter {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border-color: rgba(255, 255, 255, 0.16) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.10),
+            0 2px 8px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    /* Wrapper behind the 4 main category tabs (.glass-panel.glossy).
+       Drop the blur so the panel stops reading as flat black. The
+       desktop 3-layer background's cyan/purple tint is only 0.06 alpha
+       — designed to be amplified by the blur. Without the blur it gets
+       buried and the wrapper looks like a dark void, so we bump both
+       tints up so the panel still reads as "tinted glass" instead of
+       flat black. Drop the always-on wetGlossStreak animation
+       (continuous 6s loop) and the expensive 8-layer glow shadows. */
+    .glass-panel.glossy {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.10) 100%),
+            linear-gradient(135deg, rgba(0, 242, 254, 0.18) 0%, rgba(112, 0, 255, 0.18) 100%),
+            rgb(15, 15, 25) !important;
+        box-shadow:
+            0 8px 24px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+    }
+    .glass-panel.glossy::after {
+        animation: none !important;
+        opacity: 0 !important;
+    }
+
+    /* Secondary "Hire Me" / glass button — blur(20px) on desktop.
+       Match the desktop glass-button look without re-adding the blur:
+       on desktop the blur tints the panel with the background colors
+       and softens everything. On mobile we can't blur, so we go
+       back to the desktop's own panel opacity (var(--glass-bg) =
+       rgba(15, 15, 25, 0.4)) and let the border do the work — the
+       button reads as a tile because the cyan border outlines it,
+       not because the panel is colored. Inset top highlight +
+       soft drop shadow give the glass-edge feel without the blur.
+       Same paint cost as the original mobile override. */
     .btn-secondary {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        background: rgba(10, 8, 26, 0.85) !important;
+        background: var(--glass-bg) !important;
+        border-color: rgba(0, 242, 254, 0.70) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.12),
+            0 2px 8px rgba(0, 0, 0, 0.20) !important;
     }
 
     /* Center play button on video cards — blur(14px). */
@@ -2463,11 +2524,37 @@ footer h4 {
         background: rgba(0, 0, 0, 0.85) !important;
     }
 
-    /* Contact form panel (glass-shine) — blur(18px). */
+    /* Contact form panel (glass-shine) — blur(18px) on desktop.
+       Desktop's layered wash uses a 0.04 white sheen over var(--glass-bg)
+       (rgba(15,15,25,0.4)) — the blur smears the aurora through it.
+       Without blur the panel reads as flat dark. Keep the desktop base
+       (bumped to fully opaque so the panel doesn't read as a see-through
+       film) but skip the white-sheen overlay — on a flat opaque panel
+       without blur it just reads as a faint glare on top. Strengthen
+       the border to compensate for the lost blur softening. */
     .glass-panel {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        background: rgba(10, 8, 26, 0.92) !important;
+        /* Cyan-to-purple gradient (signature site palette) + a dark navy
+           base — same hue family desktop reads as "tinted glass" once
+           the blur smears the aurora through. Without blur the panel
+           reads flat, so we paint the cyan/purple tint directly into
+           the background instead. Single linear-gradient over a solid
+           navy fill = 2 layers, same structure as desktop's wash. */
+        background:
+            linear-gradient(135deg, rgba(0, 242, 254, 0.10) 0%, rgba(112, 0, 255, 0.10) 100%),
+            rgb(15, 15, 25) !important;
+        border-color: rgba(0, 242, 254, 0.30) !important;
+    }
+
+    /* Contact form sheen — the .glass-shine::before runs a continuous
+       6s shineSweep animation painting a white sheen across the panel.
+       Without the blur (already killed above) the panel reads as flat
+       dark, so a moving sheen looks like a glitch instead of glass.
+       Drop the sweep — the form sits still. */
+    .glass-shine::before {
+        animation: none !important;
+        opacity: 0 !important;
     }
 
     /* Mobile menu overlay — blur(20px). */
@@ -2477,17 +2564,25 @@ footer h4 {
         background: linear-gradient(180deg, rgba(15, 15, 25, 0.96) 0%, rgba(7, 7, 28, 0.98) 100%) !important;
     }
 
-    /* Pipeline step cards — blur(18px). */
+    /* Pipeline step cards — blur(18px) on desktop.
+       Drop the blur AND the layered radial-gradient wash. The
+       cyan/purple corner tints are designed to be amplified by the
+       blur — without blur they're invisible, so paying for 3 extra
+       composited layers per card to render invisible tints is pure
+       waste. Flat dark panel + slightly stronger border so the
+       cards still read as distinct surfaces against the page. */
     .pipeline-node {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        background-color: rgba(10, 8, 26, 0.92) !important;
+        background: rgba(10, 8, 26, 0.92) !important;
+        border-color: rgba(255, 255, 255, 0.14) !important;
     }
 
-    /* Pipeline node icon disc — blur(10px). */
+    /* Pipeline node icon disc — blur(10px). Flat single fill. */
     .node-icon {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
+        background: rgba(0, 242, 254, 0.12) !important;
     }
 
     /* Footer panel — blur(18px). */
