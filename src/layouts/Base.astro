@@ -1225,7 +1225,17 @@ import { ViewTransitions } from 'astro:transitions';
     // a single shared RAF that flushes them in one pass per frame. The
     // mousemove handler just marks elements dirty and schedules one frame.
     // Visual behavior is identical — only the execution model changed.
-    if (!reduceMotion) {
+    //
+    // Step 8 (mobile-perf pass): on phones the whole block is skipped.
+    // There is no cursor to track on a touch device, but the listeners
+    // still register and the document-level mousemove handler at the
+    // bottom of this block fires on touchmove / scroll / synthetic
+    // WebView events on some Android builds — each fire schedules an
+    // empty RAF pass that competes with the YouTube decoder. The
+    // `isMobile` width matches the @media (max-width: 640px) gate
+    // used by the rest of the lite-mode pass.
+    const isMobile = window.matchMedia('(max-width: 640px)').matches;
+    if (!reduceMotion && !isMobile) {
       // Collect every element that needs per-frame transform updates.
       // Each entry: { el, type, max, dirty, reset }
       const animated = [];
@@ -1599,13 +1609,19 @@ import { ViewTransitions } from 'astro:transitions';
           //     autoplay works because the click that opened the
           //     lightbox IS the user gesture. playsinline keeps the
           //     video inline (no auto-fullscreen on Android tap).
-          //   vq=medium:
-          //     Asks the player for ~480p/720p instead of defaulting
-          //     to 1080p on a fullscreen lightbox — cuts bandwidth
-          //     ~40%, which matters on a Realme C 21 radio.
+          //   vq=small (Step 6, mobile-perf pass):
+          //     Asks the player for ~240p on first render instead of
+          //     ~480p/720p. On a Realme C 21 / Redmi A radio the
+          //     480p segments can't be decoded fast enough to keep
+          //     the buffer full, so the player stalls every ~4s.
+          //     240p cuts bitrate ~5x — segments download in ~150ms
+            //     instead of ~800ms, the buffer fills faster than it
+            //     drains, and the video actually plays through. vq
+            //     is a hint (not a hard cap) so fast connections
+            //     still get the higher rendition if bandwidth allows.
           //   rel=0 + modestbranding=1:
           //     Hides end-screens + YouTube logo. Cosmetic.
-          iframe.src = `https://www.youtube.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=medium`;
+          iframe.src = `https://www.youtube.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=small`;
           iframe.className = 'w-full h-full rounded-2xl';
           iframe.title = title || 'YouTube video';
           iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');

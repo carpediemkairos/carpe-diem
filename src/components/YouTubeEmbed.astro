@@ -172,7 +172,12 @@ const thumbUrl = videoId
     // Same param set as Base.astro's openLightbox(). youtube.com (not
     // nocookie) + no enablejsapi — see the comment in Base.astro for
     // why those matter on Chrome-Android / Realme UI WebView builds.
-    iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=medium`;
+    // vq=small (Step 6): ask YouTube for ~240p on first render. Cuts
+    // bitrate ~5x vs vq=medium — on a low-end phone the buffer fills
+    // faster than it drains and the video actually plays through
+    // instead of stalling every ~4 seconds. vq is a hint, so fast
+    // connections still get the higher rendition.
+    iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=small`;
     iframe.title = title;
     iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');

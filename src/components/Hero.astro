@@ -397,6 +397,14 @@ const narrativeWorkDuration = '07:10';
     if (!nums.length) return;
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Step 7 (mobile-perf pass): on phones, skip the count-up animation
+    // entirely. The 1.7-2.2s tick does ~120 digit repaints behind a
+    // gradient + drop-shadow filter, in the same above-the-fold window
+    // where the YouTube decoder is trying to do its work. The hero is
+    // the user's first impression — the digits don't need to glide in
+    // to read as "100+". Mobile width matches the CSS @media (max-width:
+    // 640px) gate used by the rest of the lite-mode pass.
+    const isMobile = window.matchMedia('(max-width: 640px)').matches;
 
     // Longer durations + a stronger ease curve makes the deceleration
     // feel like the digits are settling into place rather than ticking.
@@ -409,7 +417,7 @@ const narrativeWorkDuration = '07:10';
 
     const animate = (el) => {
       const target = parseInt(el.dataset.countTo, 10) || 0;
-      if (reduceMotion || target === 0) {
+      if (reduceMotion || isMobile || target === 0) {
         el.textContent = String(target);
         return;
       }

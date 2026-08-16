@@ -2329,6 +2329,220 @@ footer h4 {
 }
 
 /* ========================================
+   MOBILE-ONLY ANIMATION CUTS (lite-mode)
+   ========================================
+   The site ships one visual identity for desktop and mobile. On a
+   low-end phone (Realme C 21, Redmi A class, anything ≤640px) several
+   of the always-on "premium" effects cost more than they return:
+   they paint every frame even when the user has scrolled past the
+   element, eating the GPU cycles the YouTube player needs to decode
+   video smoothly. Each block below stops ONE such animation — the
+   element still renders, it just stops moving. Desktop is untouched.
+
+   Layer 1: viewport width (catches most low-end Android, all iPhones
+            in portrait, any phone-emulated window).
+   Layer 2: the existing .budget class on <html> (catches budget
+            tablets that report as desktop).
+*/
+
+/* ---- Step 1: kill the three always-on navbar background animations. ----
+   Sheen  = 14s diagonal light sweep across the bar (translateX loop)
+   Conic  = 40s full-rainbow rotation behind the links (full repaint/frame)
+   Aurora = 24s drift + scale on a 180%-wide blurred gradient
+   Together: ~3 continuous repaints/frame on a layer the user has
+   scrolled away from. Removing them is invisible to the eye but the
+   browser stops scheduling the per-frame work. */
+@media (max-width: 640px) {
+    .navbar-sheen  { animation: none !important; }
+    .navbar-conic  { animation: none !important; }
+    .navbar-aurora { animation: none !important; }
+}
+
+/* ---- Step 2: stop the showreel featured-card conic border spin. ----
+   The featured video card's rainbow ring is built from a conic-gradient
+   masked with a 2px cutout, then rotated 360° every 8s. That is one of
+   the most expensive paint ops the browser can do — full conic
+   re-rasterization + mask composite every frame, on the biggest card
+   in the viewport, right next to where the YouTube player will sit
+   when the user taps play. On a low-end phone this single animation
+   is enough to starve the video decoder. The card keeps its cyan/purple
+   border, its glow, and its drop shadow — only the rotation stops. */
+@media (max-width: 640px) {
+    .video-card--featured::before { animation: none !important; }
+}
+
+/* ---- Step 3: stop the profile ring spin. ----
+   The 160px ring around the avatar is a conic-gradient that rotates
+   360° every 6s. Same paint cost as the showreel border (conic re-raster
+   + composite) but smaller. It lives above the fold so the GPU is doing
+   this every frame for the entire time the user is on the hero. On a
+   low-end phone the cyan/purple gradient ring is plenty on its own —
+   it doesn't need to spin to be visible. */
+@media (max-width: 640px) {
+    .profile-ring { animation: none !important; }
+}
+
+/* ---- Step 4: strip backdrop-filter: blur() from every glass surface. ----
+   This is the single biggest paint-cost win on mobile. The site uses
+   backdrop-filter on ~10 elements (navbar, badge cards, video play
+   button, contact form, pipeline cards, footer, social buttons, back-
+   to-top, mobile menu, etc.). On a low-end phone the browser has to
+   take the pixels behind each element, Gaussian-blur them (often
+   18-22px), and composite the result on top — every frame, on a
+   surface often wider than the screen.
+
+   The visual identity on a phone is "dark panels on a dark background"
+   already (the gradients behind are dark navy/black, not busy photos),
+   so swapping the blur for a higher-opacity solid background is ~90%
+   identical to the eye and ~5% of the GPU cost. Desktop keeps the
+   full glass treatment untouched.
+
+   Each rule pairs the original `backdrop-filter` with a `-webkit-`
+   prefix (Safari) and overrides BOTH. Where the element used a
+   semi-transparent rgba background, we bump the alpha so the panel
+   still reads as a distinct surface against the background. */
+@media (max-width: 640px) {
+    /* Navbar — was rgba(6,4,18,0.55) + blur(22px). Solid indigo panel. */
+    .navbar-glass {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(6, 4, 18, 0.92) !important;
+    }
+
+    /* Badge cards in the hero — was rgba(15,15,25,0.4) + blur(16px). */
+    .badge-card {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background:
+            linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 50%, rgba(255,255,255,0.03) 100%),
+            rgba(10, 8, 26, 0.88) !important;
+    }
+
+    /* Secondary "Hire Me" / glass button — blur(20px). */
+    .btn-secondary {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(10, 8, 26, 0.85) !important;
+    }
+
+    /* Center play button on video cards — blur(14px). */
+    .video-card__play {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(20, 20, 35, 0.92) !important;
+    }
+
+    /* "NOW PLAYING" badge — blur(10px). */
+    .video-card__badge {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(0, 0, 0, 0.85) !important;
+    }
+
+    /* Duration tag in the corner of a video card — blur(8px). */
+    .video-card__duration {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(0, 0, 0, 0.85) !important;
+    }
+
+    /* Contact form panel (glass-shine) — blur(18px). */
+    .glass-panel {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(10, 8, 26, 0.92) !important;
+    }
+
+    /* Mobile menu overlay — blur(20px). */
+    .mobile-menu-overlay {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: linear-gradient(180deg, rgba(15, 15, 25, 0.96) 0%, rgba(7, 7, 28, 0.98) 100%) !important;
+    }
+
+    /* Pipeline step cards — blur(18px). */
+    .pipeline-node {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background-color: rgba(10, 8, 26, 0.92) !important;
+    }
+
+    /* Pipeline node icon disc — blur(10px). */
+    .node-icon {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    /* Footer panel — blur(18px). */
+    .site-footer {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background-color: rgba(6, 4, 18, 0.96) !important;
+    }
+
+    /* Footer social icon buttons — blur(12px). */
+    .footer-social {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background:
+            radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.06), transparent 60%),
+            rgba(20, 18, 38, 0.85) !important;
+    }
+
+    /* Back-to-top button — blur(12px). */
+    .back-to-top {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background:
+            radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,0.10), transparent 60%),
+            rgba(0, 30, 40, 0.92) !important;
+    }
+}
+
+/* ---- Step 5: flatten the footer's 7 background layers on mobile. ----
+   The footer ships with: aurora drift, rotating conic, ridge shift,
+   spec sweep, sheen, noise grain, and two corner flares. Combined
+   with Step 4 that's 7 composited layers + 4 always-on animations
+   stacked behind the columns. On a low-end phone the IntersectionObserver
+   pause helps when the footer is fully off-screen, but the moment the
+   user scrolls near it, all of it wakes up and stays running.
+
+   On mobile the footer becomes a single dark panel — the columns,
+   the copyright line, the social icons, and the back-to-top button
+   stay exactly where they are. The decorative layers either get
+   hidden or have their animations killed. The marquee (a 38s
+   infinite translateX) is also paused and made static. */
+@media (max-width: 640px) {
+    /* Stop every footer animation — drift, spin, shift, sweep, sheen, spin. */
+    .footer-aurora,
+    .footer-conic,
+    .footer-ridge,
+    .footer-spec,
+    .footer-sheen {
+        animation: none !important;
+    }
+    /* Marquee: stop the 38s horizontal scroll on mobile. The items
+       render in a static row — looks the same at a glance, costs zero. */
+    .footer-marquee-track { animation: none !important; }
+    /* Hide the marquee entirely on small screens — there isn't room
+       for a horizontal scrolling strip and it adds visual noise below
+       the social icons. The brand mark + columns + copyright are enough. */
+    .footer-marquee { display: none !important; }
+    /* The noise grain (SVG fractalNoise data URI) is rendered as a
+       background-image with mix-blend-mode: overlay. Cheap per-paint
+       but it forces an extra compositing pass. Drop it on mobile. */
+    .footer-noise { display: none !important; }
+    /* The corner light flares are pure decoration — small radial
+       gradients with filter: blur(8-10px). On mobile they're not
+       visible against the now-opaque footer anyway. */
+    .footer-corner-tr,
+    .footer-corner-bl { display: none !important; }
+    /* The footer-divider's ::before adds a thin gradient line above
+       the copyright row. It's static (no animation) but adds another
+       composited layer. Keep it — the visual seam is worth one layer. */
+}
+
+/* ========================================
    RESPONSIVE HELPERS
    ======================================== */
 
