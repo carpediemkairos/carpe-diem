@@ -1938,8 +1938,8 @@ textarea.form-input { min-height: 120px; }
    ============================================================ */
 .lightbox-close {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    top: 0.15rem;
+    right: 0.1rem;
     z-index: 2;
     width: 32px;
     height: 32px;
