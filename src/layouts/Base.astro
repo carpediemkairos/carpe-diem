@@ -1923,11 +1923,26 @@ import { ViewTransitions } from 'astro:transitions';
 
       // Watch every element that might carry an animation. This is a small
       // set in our site — the things with infinite animations are:
-      //   - the Background layers (aurora, grids, noise)
+      //   - the Background layers (aurora, grids, scanlines, noise)
       //   - the Navbar (conic, sheen, aurora drift, brand mark)
       //   - the Profile ring
       //   - the showreel cards (reel border spin, badge pulse, video progress)
       //   - the status dot pulse
+      //   - glass-shine panels (continuous shine sweep)
+      //   - glass-panel.glossy (wetGlossStreak continuous sheen)
+      //   - featured video card (8s conic border spin — biggest card on page)
+      //
+      // Step 1 of the desktop perf roadmap (2026-08-21): the original list
+      // only covered the background layers + hero + showreel wrapper. The
+      // featured showreel card's 8s conic-border spin, the glass-shine
+      // sweep, the .glossy wetGlossStreak, and the .bg-scanlines layer
+      // were all running 24/7 on desktop. Mobile already killed them via
+      // @media (max-width: 640px) overrides in global.css; on desktop we
+      // just hook them into this same observer so they pause when the
+      // user scrolls past. Visually identical — when the user is looking
+      // at them, they animate; when they're scrolled off-screen, they
+      // pause. Pure CPU/GPU savings.
+      //
       // Rather than maintain a list, we watch the body and the most common
       // animated parents. The observer only fires on intersection changes,
       // so this is cheap.
@@ -1939,7 +1954,11 @@ import { ViewTransitions } from 'astro:transitions';
         document.querySelector('.bg-gradient-aurora'),
         document.querySelector('.bg-grid'),
         document.querySelector('.bg-grid-fine'),
-        document.querySelector('.bg-noise')
+        document.querySelector('.bg-noise'),
+        document.querySelector('.bg-scanlines'),
+        document.querySelector('.video-card--featured'),
+        document.querySelector('.glass-shine'),
+        document.querySelector('.glass-panel.glossy')
       ].filter(Boolean);
 
       targets.forEach((el) => { if (el) observer.observe(el); });
