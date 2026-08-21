@@ -25,6 +25,15 @@ interface Props {
   // YouTube returns a 120×90 placeholder when maxres isn't available, so
   // 'high' degrades gracefully to the same image 'low' would have served.
   resolution?: 'high' | 'low';
+  // Step 3 (perf roadmap, 2026-08-21): when true, defer the thumbnail
+  // fetch via a `data-thumb-url` attribute + IntersectionObserver swap
+  // (same pattern PortfolioGrid.astro already uses for its 24 grid
+  // thumbs). Use for below-the-fold cards — the browser won't fetch
+  // the ~20-230 KB thumbnail until the card scrolls within 200px of
+  // the viewport, saving up to ~60 KB of initial bandwidth for the
+  // showreel's 2 secondary cards. Defaults to false (eager load) so
+  // above-the-fold callers don't need to think about it.
+  lazy?: boolean;
 }
 
 const {
@@ -32,6 +41,7 @@ const {
   title = 'YouTube video',
   compact = false,
   resolution = 'high',
+  lazy = false,
 } = Astro.props;
 
 // YouTube thumbnail URL. We use maxresdefault for the cover image
@@ -39,6 +49,15 @@ const {
 const thumbUrl = videoId
   ? `https://i.ytimg.com/vi/${videoId}/${resolution === 'low' ? 'mqdefault' : 'maxresdefault'}.jpg`
   : '';
+
+// When lazy=true: render the thumbnail URL in a `data-thumb-url`
+// attribute instead of as an inline `style="background-image: url(...)"`.
+// The eager inline form forces the browser to fetch the image
+// immediately on parse. The lazy form is just a string attribute —
+// the browser can't do anything with it — so main.js sets the
+// background-image only when the card scrolls near the viewport.
+// When lazy=false: keep the existing eager inline form (no behavior
+// change for above-the-fold callers).
 ---
 
 {videoId ? (
@@ -48,7 +67,9 @@ const thumbUrl = videoId
     data-yt-id={videoId}
     data-yt-title={title}
     aria-label={`Play ${title} on YouTube`}
-    style={`background-image: url('${thumbUrl}')`}
+    {...(lazy
+      ? { 'data-thumb-url': thumbUrl }
+      : { style: `background-image: url('${thumbUrl}')` })}
   >
     <span class="yt-embed__play" aria-hidden="true">
       <svg viewBox="0 0 68 48" width="68" height="48">

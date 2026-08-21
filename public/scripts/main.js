@@ -465,6 +465,63 @@ window.closeLightbox = closeLightbox;
   lightboxEl.addEventListener('mouseenter', wake, { passive: true });
 })();
 
+// -------- Lazy secondary-showreel thumbnails (Step 3, perf roadmap) --------
+// The 2 below-the-fold YouTube cards in the showreel section are rendered
+// with their thumbnail URL in a `data-thumb-url` attribute instead of an
+// inline `style="background-image: url(...)"`. Browsers can't fetch
+// anything from a data-* attribute, so the ~23 KB (mqdefault) thumbnail
+// isn't requested until we set the inline style here, when the card is
+// within 200px of the viewport.
+//
+// Why 200px and not the IO default rootMargin of 0px:
+//   The secondary cards sit just below the featured card. On desktop
+//   the featured card is ~600px tall, so by the time the secondary cards
+//   are visible in the viewport they're usually already there — no
+//   prebuffer is needed. On mobile the featured card is taller still
+//   (~52% of the viewport at 16:9), and the user often swipes down
+//   quickly. 200px gives a comfortable prebuffer so the image is
+//   already loaded (or in-flight) by the time the card scrolls into
+//   view, avoiding a blank-flash moment.
+//
+// Same pattern PortfolioFilter.astro uses for the 24 grid thumbs.
+// IntersectionObserver support is the only browser requirement — if
+// missing, we fall back to eager-load everything (no worse than before).
+(() => {
+  const targets = document.querySelectorAll('.yt-embed[data-thumb-url]');
+  if (!targets.length) return;
+
+  const reveal = (btn) => {
+    const url = btn.getAttribute('data-thumb-url');
+    if (!url) return;
+    btn.style.backgroundImage = `url('${url}')`;
+    btn.removeAttribute('data-thumb-url');
+  };
+
+  if (!('IntersectionObserver' in window)) {
+    targets.forEach(reveal);
+    return;
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        reveal(e.target);
+        io.unobserve(e.target);
+      }
+    }
+  }, { rootMargin: '0px 0px 200px 0px', threshold: 0 });
+
+  targets.forEach((btn) => io.observe(btn));
+
+  // Safety net (matches PortfolioFilter.astro): if a card is already in
+  // the viewport at load time but the observer hasn't fired yet (e.g.
+  // short pages, refresh mid-scroll), force-reveal everything after 2s.
+  // Without this the user would see blank cards for up to 2s.
+  setTimeout(() => {
+    document.querySelectorAll('.yt-embed[data-thumb-url]').forEach(reveal);
+  }, 2000);
+})();
+
 // -------- Mobile showreel: progress bar + rail dot indicator --------
 // On mobile (≤767px) the cover card has a thin progress bar that fills
 // while the muted video plays, and the rail has a dot indicator that
