@@ -403,6 +403,11 @@ function openLightbox(title, videoOrYoutubeId, thumbnailUrl) {
   if (!lightbox || !lightboxContent) return;
   // Reset content
   lightboxContent.innerHTML = '';
+  // Title heading is only shown for the "no video" placeholder. For any
+  // branch that actually plays a video (lite-embed poster, immediate
+  // iframe, direct video URL), we skip the heading entirely — the user
+  // wants to watch the video, not read a label. The lite-embed poster
+  // already carries the thumbnail (which is the visual title).
   const heading = document.createElement('p');
   heading.className = 'font-orbitron text-xs tracking-widest text-cyan mb-3 absolute top-3 left-4';
   heading.textContent = title || 'PREVIEW';
@@ -491,13 +496,12 @@ function openLightbox(title, videoOrYoutubeId, thumbnailUrl) {
       wrap.appendChild(v);
     }
   } else {
-    const msg = document.createElement('p');
-    msg.className = 'font-orbitron text-sm tracking-widest text-silver';
-    msg.textContent = 'VIDEO COMING SOON';
-    wrap.appendChild(msg);
+    // No video to play — show the title heading as the only content
+    // (it's already inside `wrap`, see below). This is the only branch
+    // where we append the heading; video branches skip it entirely.
+    wrap.appendChild(heading);
   }
   lightboxContent.appendChild(wrap);
-  lightboxContent.appendChild(heading);
   // OPEN — native <dialog> (perf audit Step 14, 2026-08-05).
   // The browser handles focus trap, ESC-to-close, inert background,
   // click-outside-to-close, and ARIA for free.
