@@ -391,12 +391,17 @@ function openLightbox(title, videoOrYoutubeId) {
   // click-outside-to-close, and ARIA for free.
   lightbox.showModal();
   document.body.style.overflow = 'hidden';
-  // Pause every page-level CSS animation + the tilt/magnet RAF loop
-  // so the GPU/CPU is free for the video decoder. Critical on low-end
-  // phones (Realme C 21, etc.) — without this, the conic border spin,
-  // badge pulse, profile ring, and 3D tilt eat enough CPU that
-  // YouTube's player stalls and the video re-buffers every ~4s.
-  pausePageForPlayback();
+  // Defer the pausePageForPlayback walk by one frame so the dialog
+  // paints first. The walk does `document.querySelectorAll('body *')`
+  // + `el.getAnimations({ subtree: true })` on every node, which on
+  // a busy page can take 100-400ms — long enough that the click feels
+  // unresponsive if it runs synchronously inside the click handler.
+  // Running it in the next frame lets showModal() return, the dialog
+  // paint, and the YouTube iframe start loading before the walk
+  // begins. __pauseForPlayback is set INSIDE the walk, so the
+  // tilt/magnet loop will run for exactly one extra frame (~16ms)
+  // after the click — negligible.
+  requestAnimationFrame(() => pausePageForPlayback());
 }
 
 function closeLightbox() {

@@ -1865,7 +1865,14 @@ textarea.form-input { min-height: 120px; }
     max-width: 100vw;
     max-height: 100vh;
     background: transparent;
-    animation: fadeIn 0.25s ease;
+    /* Snappier open: 120ms opacity-only fade. The previous 250ms fade
+       also animated `transform: scale(0.98 → 1)`, which forced a
+       compositor layer on the dialog AND its child iframe on every
+       open — the layer creation competes with the YouTube embed's
+       first paint, so the inner area stayed black for the full 250ms.
+       Opacity-only avoids the layer creation. The scale gave a tiny
+       "pop" feel; on a low-end phone that cost more than it was worth. */
+    animation: fadeIn 0.12s ease;
 }
 
 #lightbox::backdrop {
@@ -2103,8 +2110,13 @@ textarea.form-input { min-height: 120px; }
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.98); }
-    to { opacity: 1; transform: scale(1); }
+    /* Opacity-only on purpose. Adding `transform` here forces a
+       compositor layer on the dialog and its iframe, which delays
+       the first paint of the YouTube embed by ~100-200ms on low-end
+       phones. Opacity-only is composited on the GPU without a new
+       layer and lets the iframe start painting immediately. */
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* ========================================
