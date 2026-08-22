@@ -96,9 +96,15 @@ import { ViewTransitions } from 'astro:transitions';
   <meta http-equiv="accept-ch" content="Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Model, downlink, ect, rtt" />
   <link rel="dns-prefetch" href="https://i.ytimg.com" />
 
-  <!-- Self-hosted fonts (3 variable files cover all 8 weights).
-       Loads ~81 KB total vs ~600 KB from Google Fonts CDN.
-       font-display: swap shows fallback text immediately, swaps in real font when ready. -->
+  <!-- Self-hosted fonts. Inter + Orbitron are preloaded (used above the
+       fold and on the H1 LCP element). JetBrains Mono is intentionally
+       NOT preloaded — it's only used in the tiny "07:10" duration badge
+       on the showreel card, where the system monospace fallback (Menlo
+       on iOS, monospace on Android) is visually identical. Removing the
+       preload saves ~21 KB / 1 request on the mobile critical path. The
+       browser still fetches JetBrains Mono automatically the first time
+       it parses the @font-face rule (~200-500ms after first paint), then
+       swaps it in via font-display: swap. Net visual change: none. -->
   <link rel="preload" href="/fonts/Inter-VF.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/fonts/Orbitron-VF.woff2" as="font" type="font/woff2" crossorigin />
   <style is:inline>
@@ -120,7 +126,10 @@ import { ViewTransitions } from 'astro:transitions';
       src: url('/fonts/Orbitron-VF.woff2') format('woff2-variations'),
            url('/fonts/Orbitron-VF.woff2') format('woff2');
     }
-    /* JetBrains Mono — variable font, weight 400 (NEW — was falling back to Menlo) */
+    /* JetBrains Mono — variable font, weight 400.
+       Not preloaded (saves ~21 KB on mobile critical path). The duration
+       badge falls back to the system monospace stack until the font
+       loads automatically ~200-500ms after first paint. */
     @font-face {
       font-family: 'JetBrains Mono';
       font-style: normal;
