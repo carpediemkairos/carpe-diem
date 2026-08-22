@@ -1578,9 +1578,9 @@ a.badge-card:hover .badge-icon {
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--glass-border);
     cursor: pointer;
-    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-                box-shadow 0.5s ease,
-                border-color 0.4s ease;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.3s ease;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -1588,7 +1588,6 @@ a.badge-card:hover .badge-icon {
     box-shadow:
         0 8px 24px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    transform-style: preserve-3d;
     /* Skip layout/paint for cards that are off-screen. The intrinsic-size
        hint tells the browser to reserve ~300px of vertical space until the
        card scrolls into view, at which point the real height replaces it.
@@ -1596,14 +1595,6 @@ a.badge-card:hover .badge-icon {
        rendering work, and visible-but-off-screen cards skip work too. */
     content-visibility: visible;
     contain-intrinsic-size: 0 300px;
-}
-
-.portfolio-item:hover {
-    border-color: rgba(0, 242, 254, 0.5);
-    box-shadow:
-        0 30px 60px rgba(0, 0, 0, 0.55),
-        0 0 0 1px rgba(0, 242, 254, 0.15),
-        0 0 50px rgba(0, 242, 254, 0.25);
 }
 
 .portfolio-thumb {
@@ -1622,17 +1613,15 @@ a.badge-card:hover .badge-icon {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s ease;
+    /* Transitions on the thumb image are desktop-only too — see the
+       @media (hover: hover) block below. The transition machinery is
+       pre-allocated for every card on every device, even though touch
+       devices never trigger a sustained hover. The shorter 0.3s timing
+       also makes the desktop effect feel more responsive. */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.3s ease;
     transform: translateZ(0);
 }
 
-.portfolio-item:hover .portfolio-thumb img,
-.portfolio-item:hover .portfolio-thumb video {
-    transform: scale(1.1);
-    filter: saturate(1.2) contrast(1.05);
-}
-
-/* Glossy play button — SVG, no Unicode */
 .portfolio-thumb::after {
     content: "";
     position: absolute;
@@ -1673,6 +1662,25 @@ a.badge-card:hover .badge-icon {
 }
 
 @media (hover: hover) {
+    /* All hover-driven visual effects for the portfolio grid are
+       scoped to devices with a real hover-capable pointer. On touch
+       devices :hover fires only on initial tap and disappears within
+       ~300ms, so the card border flash, shadow expansion, and thumb
+       scale-up are a glitch, not a feature. Skipping these rules on
+       touch devices also lets the browser skip pre-allocating the
+       hover-state transition targets, which adds up across 24 cards. */
+    .portfolio-item:hover {
+        border-color: rgba(0, 242, 254, 0.5);
+        box-shadow:
+            0 30px 60px rgba(0, 0, 0, 0.55),
+            0 0 0 1px rgba(0, 242, 254, 0.15),
+            0 0 50px rgba(0, 242, 254, 0.25);
+    }
+    .portfolio-item:hover .portfolio-thumb img,
+    .portfolio-item:hover .portfolio-thumb video {
+        transform: scale(1.1);
+        filter: saturate(1.2) contrast(1.05);
+    }
     .portfolio-thumb::after {
         opacity: 0;
         transform: translate(-50%, -50%) scale(0.6);
