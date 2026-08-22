@@ -1865,14 +1865,12 @@ textarea.form-input { min-height: 120px; }
     max-width: 100vw;
     max-height: 100vh;
     background: transparent;
-    /* Snappier open: 120ms opacity-only fade. The previous 250ms fade
-       also animated `transform: scale(0.98 → 1)`, which forced a
-       compositor layer on the dialog AND its child iframe on every
-       open — the layer creation competes with the YouTube embed's
-       first paint, so the inner area stayed black for the full 250ms.
-       Opacity-only avoids the layer creation. The scale gave a tiny
-       "pop" feel; on a low-end phone that cost more than it was worth. */
-    animation: fadeIn 0.12s ease;
+    /* No animation on the dialog itself — showModal() should be
+       instant. The previous opacity-only fade (0.12s) still delayed
+       the user's perception of the dialog opening by one paint frame.
+       The soft-entrance feel is now on the inner frame below (.lightbox-
+       frame), so the dialog appears immediately but the content still
+       fades in. */
 }
 
 #lightbox::backdrop {
@@ -1911,6 +1909,13 @@ textarea.form-input { min-height: 120px; }
     border-radius: 1rem;
     overflow: hidden;
     background: #000;
+    /* Soft entrance for the frame content. Applied to the inner frame
+       (not the <dialog>), so the dialog itself appears instantly on
+       showModal() and only the video area fades in. Opacity-only —
+       no transform — to avoid forcing a compositor layer on the
+       child iframe. 80ms is short enough to feel instant but long
+       enough to mask the YouTube embed's first-frame pop. */
+    animation: fadeIn 0.08s ease;
     /* No border — a 1px white border on a rounded corner renders with
        subpixel antialiasing that looks jagged/rough against the
        smooth box-shadow glow. The shadow already defines the frame's
@@ -2098,6 +2103,64 @@ textarea.form-input { min-height: 120px; }
 /* Landscape orientation on short phones (e.g. iPhone SE landscape, 667×375):
    the viewport height is the limiting factor. The min() in .lightbox-frame
    already handles this via the 100vh * 16/9 term. */
+
+
+/* ============================================================
+   LIGHTBOX LOADER
+   ============================================================ */
+/* Sits on top of the YouTube iframe while the player boots. The
+   iframe has to fetch base.js + player.js + the playManifest before
+   it can paint a single frame, which is 1-3s on a typical connection.
+   Without this overlay the user just sees a black rectangle. */
+.lightbox-loader {
+    position: absolute;
+    inset: 0;
+    z-index: 5;            /* above the iframe (which has no z-index), below .lightbox-close (z-index 10) */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: #000;
+    /* Fade out when the iframe fires `load`. The transition is on
+       the loader, not the iframe, so the iframe's first paint is
+       not delayed by compositor work on top of it. */
+    transition: opacity 0.2s ease;
+    pointer-events: none;  /* never block clicks on the iframe */
+    opacity: 1;
+}
+/* .lightbox-loader--pending starts the loader hidden. JS removes
+   this class after 120ms only if the iframe `load` event hasn't
+   fired yet — so a snappy cached open never shows the loader. */
+.lightbox-loader--pending {
+    opacity: 0;
+}
+.lightbox-loader--hidden {
+    opacity: 0;
+}
+.lightbox-loader__spinner {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    /* 2px ring with the top quarter being the cyan accent, the rest
+       a low-opacity white. Spins via the conic gradient + mask trick
+       so we don't need an SVG or a 3rd-party animation. */
+    background: conic-gradient(from 0deg, rgba(0, 242, 254, 0.95) 0deg, rgba(0, 242, 254, 0.95) 90deg, rgba(255, 255, 255, 0.15) 90deg, rgba(255, 255, 255, 0.15) 360deg);
+    -webkit-mask: radial-gradient(circle, transparent 18px, #000 19px);
+            mask: radial-gradient(circle, transparent 18px, #000 19px);
+    animation: lightboxLoaderSpin 0.9s linear infinite;
+    will-change: transform;
+}
+@keyframes lightboxLoaderSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+.lightbox-loader__label {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0;
+}
 
 
 /* Hide the redundant centered play icon when the card uses YouTubeEmbed.

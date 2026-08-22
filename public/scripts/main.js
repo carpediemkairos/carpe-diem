@@ -363,6 +363,47 @@ function openLightbox(title, videoOrYoutubeId) {
       iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
       iframe.setAttribute('allowfullscreen', '');
       wrap.appendChild(iframe);
+
+      // Loading overlay — covers the iframe while YouTube's player
+      // boots. The YouTube embed has to fetch base.js + player.js +
+      // the playManifest before it paints a single frame, which on a
+      // typical connection is 1-3 seconds — without this the user
+      // just sees a black rectangle and assumes the click is broken.
+      // The overlay is a sibling of the iframe inside the relative
+      // `wrap`, positioned absolutely on top. Hidden when the iframe
+      // fires its `load` event (which fires when the embed document
+      // has parsed, not when playback has started — that's fine, the
+      // player's own loading spinner takes over from there).
+      const loader = document.createElement('div');
+      loader.className = 'lightbox-loader lightbox-loader--pending';
+      loader.setAttribute('aria-hidden', 'true');
+      loader.innerHTML = `
+        <div class="lightbox-loader__spinner" aria-hidden="true"></div>
+        <p class="lightbox-loader__label font-orbitron">LOADING</p>
+      `;
+      wrap.appendChild(loader);
+      // After 120ms, if the iframe is still loading, fade the loader
+      // in. This avoids a flash when the iframe `load` event fires
+      // from browser cache (under ~100ms) — the loader never becomes
+      // visible, so a snappy open stays snappy.
+      const showTimer = setTimeout(() => loader.classList.remove('lightbox-loader--pending'), 120);
+      // Use a one-time `load` listener. `{ once: true }` auto-removes
+      // it after firing so we don't leak handlers on repeat opens.
+      // Fallback: if `load` never fires (network blocked, ad-blocker
+      // rewriting the iframe, etc.) the loader stays up to 8s, then
+      // we give up and let the user see whatever the iframe shows.
+      let loaderHidden = false;
+      const hideLoader = () => {
+        if (loaderHidden) return;
+        loaderHidden = true;
+        clearTimeout(showTimer);
+        loader.classList.add('lightbox-loader--hidden');
+        // Remove from the DOM after the fade so the user can't tab
+        // to a now-invisible element.
+        setTimeout(() => loader.remove(), 250);
+      };
+      iframe.addEventListener('load', hideLoader, { once: true });
+      setTimeout(hideLoader, 8000);
     } else {
       // Direct video URL (mp4, webm, etc.)
       const v = document.createElement('video');
