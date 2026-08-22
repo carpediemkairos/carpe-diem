@@ -66,9 +66,10 @@ const thumbUrl = videoId
     class={`yt-embed ${compact ? 'yt-embed--compact' : ''}`}
     data-yt-id={videoId}
     data-yt-title={title}
+    data-thumb-url={thumbUrl}
     aria-label={`Play ${title} on YouTube`}
     {...(lazy
-      ? { 'data-thumb-url': thumbUrl }
+      ? {}  /* data-thumb-url above already carries the URL; lazy just means no inline background-image */
       : { style: `background-image: url('${thumbUrl}')` })}
   >
     <span class="yt-embed__play" aria-hidden="true">
@@ -208,8 +209,11 @@ const thumbUrl = videoId
 
     // Preferred path: open the shared dialog. openLightbox() also accepts
     // an 11-char YouTube ID and builds the right iframe + params (Base.astro:362-375).
+    // Pass the thumbnail URL (3rd arg) so the lightbox shows the thumbnail
+    // instantly via the lite-embed pattern, instead of waiting 1-3s for
+    // the YouTube player to boot from cold.
     if (typeof (window as any).openLightbox === 'function') {
-      (window as any).openLightbox(title, id);
+      (window as any).openLightbox(title, id, btn.dataset.thumbUrl || '');
       return;
     }
 
@@ -219,12 +223,7 @@ const thumbUrl = videoId
     // Same param set as Base.astro's openLightbox(). youtube.com (not
     // nocookie) + no enablejsapi — see the comment in Base.astro for
     // why those matter on Chrome-Android / Realme UI WebView builds.
-    // vq=small (Step 6): ask YouTube for ~240p on first render. Cuts
-    // bitrate ~5x vs vq=medium — on a low-end phone the buffer fills
-    // faster than it drains and the video actually plays through
-    // instead of stalling every ~4 seconds. vq is a hint, so fast
-    // connections still get the higher rendition.
-    iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=small`;
+    iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
     iframe.title = title;
     iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');

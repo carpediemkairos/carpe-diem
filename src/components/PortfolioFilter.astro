@@ -31,8 +31,18 @@
       const reveal = (btn: HTMLElement) => {
         const url = btn.getAttribute('data-thumb-url');
         if (!url) return;
-        btn.style.backgroundImage = `url('${url}')`;
-        btn.removeAttribute('data-thumb-url');
+        // Only set the inline background-image if the button doesn't
+        // already have one. YouTubeEmbed.astro renders eager cards with
+        // an inline `style="background-image: url('...')"` already, so
+        // for those this is a no-op — we skip to keep DOM writes minimal.
+        if (!btn.style.backgroundImage) {
+          btn.style.backgroundImage = `url('${url}')`;
+        }
+        // Intentionally do NOT remove data-thumb-url — openLightbox()
+        // reads it on click to render the lite-embed poster. Without it
+        // the lightbox would have to either re-derive the URL from the
+        // YouTube ID (works) or wait for the player to boot from cold
+        // (the slow behavior we're trying to eliminate).
       };
 
       if (!('IntersectionObserver' in window)) {
@@ -81,6 +91,19 @@
           e.stopPropagation(); // don't let YouTubeEmbed.astro's document handler also call openLightbox()
           const title = card.dataset.title || 'PROJECT';
           const source = card.dataset.youtubeId || card.dataset.video || '';
+          // Single-click play for portfolio cards. The lite-embed pattern
+          // (thumbnail → play button) would force a second click before the
+          // video plays, which feels broken on small grid cards where users
+          // expect "click = play" — same as every other video thumbnail on
+          // the open web. We still get the perf wins from changes 1-3
+          // (preconnect, no vq=small, deferred page-pause walk) — only
+          // the lite-embed visual path is skipped here.
+          //
+          // Note: we deliberately do NOT pass a thumbnail URL (3rd arg
+          // stays empty). When openLightbox() receives no thumbnail, it
+          // builds the iframe immediately on click — the user sees the
+          // lightbox open with the YouTube player booting in place, same
+          // as the pre-2026-08-22 behavior on these cards.
           if (typeof (window as any).openLightbox === 'function') {
             (window as any).openLightbox(title, source);
           } else {

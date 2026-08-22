@@ -2170,6 +2170,93 @@ textarea.form-input { min-height: 120px; }
 }
 
 
+/* ============================================================
+   LIGHTBOX LITE-EMBED PLAY OVERLAY
+   ============================================================ */
+/* Shown when openLightbox() is called with a thumbnail URL. The
+   thumbnail fills the frame and a big centered play button sits on
+   top — same UX as youtube.com's own embeds. Clicking the button
+   replaces the overlay with the YouTube iframe (autoplay=1, no
+   further click required). Until that click, NO YouTube JS loads —
+   the iframe doesn't exist in the DOM yet, so the page stays fast
+   and the video decoder isn't competing with anything.
+
+   Why not just embed the iframe and skip this: YouTube's player
+   fetches ~500 KB of JS + the playManifest before it can paint its
+   first frame, which is 1-3 seconds of staring at a black box on a
+   typical connection. Showing the already-loaded thumbnail instead
+   makes the open feel instant. */
+.lightbox-poster {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: #000;
+    /* `cursor: pointer` here (not on the inner play button) so the
+       cursor stays "pointer" everywhere on the poster — including
+       the dark letterbox bars if the thumbnail isn't true 16:9. */
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: inherit;
+}
+.lightbox-poster__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    /* YouTube's maxresdefault.jpg can take 200-400ms to load on first
+       visit. The poster is already instant from the user's POV (the
+       dialog opens, they see… a black box briefly if the image isn't
+       cached). A subtle zoom on load reads as "the thumbnail arrived"
+       instead of "the page is broken". Subtle on purpose — the click
+       target must stay obviously clickable, not feel like decoration. */
+    animation: lightboxPosterIn 0.35s ease-out;
+}
+@keyframes lightboxPosterIn {
+    from { opacity: 0; transform: scale(1.02); }
+    to   { opacity: 1; transform: scale(1); }
+}
+/* Centered play triangle. Big (~96px) so it's an obvious click target
+   on touch devices; uses the YouTube red rectangle silhouette so users
+   recognize it instantly. The white triangle on red is the same
+   contrast pair youtube.com uses for its own play buttons. */
+.lightbox-poster__play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;     /* the .lightbox-poster button catches the click */
+    transition: transform 0.2s ease, filter 0.2s ease;
+    filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.6));
+}
+.lightbox-poster:hover .lightbox-poster__play {
+    transform: scale(1.08);
+}
+.lightbox-poster:focus-visible {
+    outline: 2px solid var(--cyan, #00f2fe);
+    outline-offset: -3px;     /* sit inside the rounded corners */
+}
+.lightbox-poster__play svg {
+    width: 96px;
+    height: 68px;
+}
+@media (max-width: 640px) {
+    /* Slightly smaller play triangle on phones — keeps it from
+       dominating the small frame on a 360px-wide viewport. */
+    .lightbox-poster__play svg {
+        width: 72px;
+        height: 50px;
+    }
+}
+
+
 /* Hide the redundant centered play icon when the card uses YouTubeEmbed.
    That component already provides a click target with its own play SVG,
    so the .video-card__play overlay underneath becomes visual noise and a

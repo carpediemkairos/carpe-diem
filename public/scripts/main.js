@@ -289,7 +289,117 @@ function resumePageAfterPlayback() {
   // cursor movement after close.
 }
 
-function openLightbox(title, videoOrYoutubeId) {
+// Build a YouTube embed iframe AND its matching loader bar, append
+// both into the given parent, and wire up the iframe-load → hide-
+// loader flow. Used by both the lite-embed poster path (poster's
+// click handler calls this on user gesture) and the immediate-iframe
+// legacy path (called right inside openLightbox). Pulled out so the
+// two call sites share the param set + styling — drift between them
+// was the bug the original vq=small comment was trying (and failing)
+// to prevent.
+//
+// Returns the iframe element so the poster's click handler can use
+// replaceWith(iframe) — and so the openLightbox caller can attach
+// its own listener (e.g. the page-pause deferral).
+function buildYoutubeIframe(videoOrYoutubeId, title, parent) {
+  const iframe = document.createElement('iframe');
+  // Why these params:
+  //   youtube.com/embed  (NOT youtube-nocookie.com):
+  //     The nocookie domain uses a cookie-less session that
+  //     has a known issue on Chrome-on-Android (esp. Realme UI
+  //     and older WebView builds): the player initializes,
+  //     buffers 3-5 seconds, then stalls forever because it
+  //     can't renegotiate the session. youtube.com uses a
+  //     normal cookie session and plays cleanly. We keep the
+  //     "nocookie" privacy stance via the lite-embed pattern
+  //     (the iframe only loads AFTER the user clicks play,
+  //     and we never set YouTube tracking cookies ourselves).
+  //   enablejsapi=1 REMOVED:
+  //     Opens a postMessage channel that some Android browsers
+  //     mishandle when combined with autoplay=1. The player
+  //     waits for a JS handshake that never arrives, then
+  //     pauses to "save bandwidth" — looks exactly like
+  //     infinite buffering. Not needed here (we don't talk
+  //     to the iframe after creation).
+  //   autoplay=1 + playsinline=1 KEPT:
+  //     autoplay works because the click that opened the
+  //     lightbox IS the user gesture. playsinline keeps the
+  //     video inline (no auto-fullscreen on Android tap).
+  //   rel=0 + modestbranding=1:
+  //     Hides end-screens + YouTube logo. Cosmetic.
+  iframe.src = `https://www.youtube.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+  // No border-radius on the iframe on purpose. The parent
+  // .lightbox-frame has overflow: hidden + border-radius: 1rem
+  // which clips the iframe to the frame's rounded shape. Adding
+  // a border-radius directly on the iframe is unreliable —
+  // Chrome inconsistently honors border-radius on replaced
+  // elements (iframes), and when it does honor it, the curve
+  // can be 1-2px outside the frame's clip (because the frame's
+  // 1px border eats into the inner radius), leaving the
+  // iframe's corners peeking out past the frame's curve.
+  //
+  // background: #000 set explicitly to match the frame. Some
+  // browsers render iframes with a white default background
+  // before the embedded page paints — that white would show
+  // through any transparent areas of YouTube's page and create
+  // a visible color edge at the rounded corner clip.
+  iframe.className = 'w-full h-full';
+  iframe.style.background = '#000';
+  iframe.title = title || 'YouTube video';
+  iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+  iframe.setAttribute('allowfullscreen', '');
+
+  // Loading bar — matches YouTube's own loading bar exactly
+  // (3px, #ff0000, bottom-flush, indeterminate slide). Shows
+  // while the iframe fetches base.js + player.js + playManifest
+  // before its first paint. Hidden on the iframe's `load` event.
+  // Why match YouTube's bar instead of our own spinner: the
+  // player takes over ~1-3s later with the same exact bar in
+  // the same exact position. A spinner would have to fade out
+  // and be replaced by the YouTube bar, which reads as a UI
+  // transition. Matching the bar reads as the player booting
+  // up — the same experience the user has on youtube.com.
+  //
+  // Note: the loader is appended into the iframe's parent (the
+  // lightbox wrap), not into the iframe itself. The caller is
+  // responsible for putting the loader where it should sit
+  // (sibling of the iframe, not inside it).
+  const loader = document.createElement('div');
+  loader.className = 'lightbox-loader lightbox-loader--pending';
+  loader.setAttribute('aria-hidden', 'true');
+  loader.innerHTML = '<div class="lightbox-loader__bar" aria-hidden="true"></div>';
+  // After 120ms, if the iframe is still loading, fade the bar
+  // in. This avoids a flash when the iframe `load` event fires
+  // from browser cache (under ~100ms) — the bar never becomes
+  // visible, so a snappy open stays snappy.
+  const showTimer = setTimeout(() => loader.classList.remove('lightbox-loader--pending'), 120);
+  // Use a one-time `load` listener. `{ once: true }` auto-removes
+  // it after firing so we don't leak handlers on repeat opens.
+  // Fallback: if `load` never fires (network blocked, ad-blocker
+  // rewriting the iframe, etc.) the bar stays up to 8s, then we
+  // give up and let the user see whatever the iframe shows.
+  let loaderHidden = false;
+  const hideLoader = () => {
+    if (loaderHidden) return;
+    loaderHidden = true;
+    clearTimeout(showTimer);
+    loader.classList.add('lightbox-loader--hidden');
+    // Remove from the DOM after the fade so the user can't tab
+    // to a now-invisible element.
+    setTimeout(() => loader.remove(), 250);
+  };
+  iframe.addEventListener('load', hideLoader, { once: true });
+  setTimeout(hideLoader, 8000);
+
+  // Append into the parent as siblings — the loader must NOT be inside
+  // the iframe (it would be hidden by the iframe document, and cross-
+  // origin prevents DOM access either way).
+  parent.appendChild(iframe);
+  parent.appendChild(loader);
+  return iframe;
+}
+
+function openLightbox(title, videoOrYoutubeId, thumbnailUrl) {
   if (!lightbox || !lightboxContent) return;
   // Reset content
   lightboxContent.innerHTML = '';
@@ -306,101 +416,65 @@ function openLightbox(title, videoOrYoutubeId) {
       /^[A-Za-z0-9_-]+$/.test(videoOrYoutubeId) &&
       !videoOrYoutubeId.startsWith('http');
     if (isYoutubeId) {
-      const iframe = document.createElement('iframe');
-      // Why these params:
-      //   youtube.com/embed  (NOT youtube-nocookie.com):
-      //     The nocookie domain uses a cookie-less session that
-      //     has a known issue on Chrome-on-Android (esp. Realme UI
-      //     and older WebView builds): the player initializes,
-      //     buffers 3-5 seconds, then stalls forever because it
-      //     can't renegotiate the session. youtube.com uses a
-      //     normal cookie session and plays cleanly. We keep the
-      //     "nocookie" privacy stance via the lite-embed pattern
-      //     (the iframe only loads AFTER the user clicks play,
-      //     and we never set YouTube tracking cookies ourselves).
-      //   enablejsapi=1 REMOVED:
-      //     Opens a postMessage channel that some Android browsers
-      //     mishandle when combined with autoplay=1. The player
-      //     waits for a JS handshake that never arrives, then
-      //     pauses to "save bandwidth" — looks exactly like
-      //     infinite buffering. Not needed here (we don't talk
-      //     to the iframe after creation).
-      //   autoplay=1 + playsinline=1 KEPT:
-      //     autoplay works because the click that opened the
-      //     lightbox IS the user gesture. playsinline keeps the
-      //     video inline (no auto-fullscreen on Android tap).
-      //   vq=small (Step 6, mobile-perf pass):
-      //     Asks the player for ~240p on first render instead of
-      //     ~480p/720p. On a Realme C 21 / Redmi A radio the
-      //     480p segments can't be decoded fast enough to keep
-      //     the buffer full, so the player stalls every ~4s.
-      //     240p cuts bitrate ~5x — segments download in ~150ms
-      //     instead of ~800ms, the buffer fills faster than it
-      //     drains, and the video actually plays through. vq
-      //     is a hint (not a hard cap) so fast connections
-      //     still get the higher rendition if bandwidth allows.
-      //   rel=0 + modestbranding=1:
-      //     Hides end-screens + YouTube logo. Cosmetic.
-      iframe.src = `https://www.youtube.com/embed/${videoOrYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=small`;
-      // No border-radius on the iframe on purpose. The parent
-      // .lightbox-frame has overflow: hidden + border-radius: 1rem
-      // which clips the iframe to the frame's rounded shape. Adding
-      // a border-radius directly on the iframe is unreliable —
-      // Chrome inconsistently honors border-radius on replaced
-      // elements (iframes), and when it does honor it, the curve
-      // can be 1-2px outside the frame's clip (because the frame's
-      // 1px border eats into the inner radius), leaving the
-      // iframe's corners peeking out past the frame's curve.
+      // LITE-EMBED PATH (perf audit, 2026-08-22):
+      // When the caller passes a thumbnail URL, render the thumbnail +
+      // a big centered play button instead of the iframe. The user sees
+      // an instant visual (the thumbnail is already loaded by the card),
+      // and the YouTube iframe is NOT created until they click play.
+      // This is the entire reason the lightbox "felt slow" before —
+      // YouTube's player fetches ~500 KB of JS + the playManifest
+      // before it can paint its first frame (1-3s on a typical
+      // connection). Showing the thumbnail eliminates that wait.
       //
-      // background: #000 set explicitly to match the frame. Some
-      // browsers render iframes with a white default background
-      // before the embedded page paints — that white would show
-      // through any transparent areas of YouTube's page and create
-      // a visible color edge at the rounded corner clip.
-      iframe.className = 'w-full h-full';
-      iframe.style.background = '#000';
-      iframe.title = title || 'YouTube video';
-      iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
-      iframe.setAttribute('allowfullscreen', '');
-      wrap.appendChild(iframe);
-
-      // Loading bar — matches YouTube's own loading bar exactly
-      // (3px, #ff0000, bottom-flush, indeterminate slide). Shows
-      // while the iframe fetches base.js + player.js + playManifest
-      // before its first paint. Hidden on the iframe's `load` event.
-      // Why match YouTube's bar instead of our own spinner: the
-      // player takes over ~1-3s later with the same exact bar in
-      // the same exact position. A spinner would have to fade out
-      // and be replaced by the YouTube bar, which reads as a UI
-      // transition. Matching the bar reads as the player booting
-      // up — the same experience the user has on youtube.com.
-      const loader = document.createElement('div');
-      loader.className = 'lightbox-loader lightbox-loader--pending';
-      loader.setAttribute('aria-hidden', 'true');
-      loader.innerHTML = '<div class="lightbox-loader__bar" aria-hidden="true"></div>';
-      wrap.appendChild(loader);
-      // After 120ms, if the iframe is still loading, fade the bar
-      // in. This avoids a flash when the iframe `load` event fires
-      // from browser cache (under ~100ms) — the bar never becomes
-      // visible, so a snappy open stays snappy.
-      const showTimer = setTimeout(() => loader.classList.remove('lightbox-loader--pending'), 120);
-      // Use a one-time `load` listener. `{ once: true }` auto-removes
-      // it after firing so we don't leak handlers on repeat opens.
-      // Fallback: if `load` never fires (network blocked, ad-blocker
-      // rewriting the iframe, etc.) the bar stays up to 8s, then we
-      // give up and let the user see whatever the iframe shows.
-      let loaderHidden = false;
-      const hideLoader = () => {
-        if (loaderHidden) return;
-        loaderHidden = true;
-        clearTimeout(showTimer);
-        loader.classList.add('lightbox-loader--hidden');
-        // Remove from the DOM after the fade so the user can't tab
-        // to a now-invisible element.
-        setTimeout(() => loader.remove(), 250);
-      };
-      iframe.addEventListener('load', hideLoader, { once: true });
-      setTimeout(hideLoader, 8000);
+      // Autoplay still works: the play-button click IS the user
+      // gesture, exactly the same as the original lightbox-open click.
+      // Playsinline keeps it inline on Android (no auto-fullscreen).
+      //
+      // Backwards compat: callers that don't pass a thumbnail (direct
+      // video URLs, "coming soon" placeholders, anything else) fall
+      // through to the original immediate-iframe path below.
+      if (thumbnailUrl) {
+        const poster = document.createElement('button');
+        poster.type = 'button';
+        poster.className = 'lightbox-poster';
+        poster.setAttribute('aria-label', `Play ${title || 'video'}`);
+        // Store the YouTube ID + title on the button so the click
+        // handler (defined right below) can build the iframe without
+        // needing to capture variables from the outer scope. Also
+        // useful for debugging — the button tells you what it is.
+        poster.dataset.ytId = videoOrYoutubeId;
+        poster.dataset.ytTitle = title || '';
+        poster.innerHTML = `
+          <img class="lightbox-poster__img" src="${thumbnailUrl}" alt="" loading="eager" decoding="async" />
+          <span class="lightbox-poster__play" aria-hidden="true">
+            <svg viewBox="0 0 68 48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#f00"/><path d="M45 24 27 14v20" fill="#fff"/></svg>
+          </span>`;
+        // Click → swap poster for iframe (autoplay). Using replaceWith
+        // so the poster is gone from the DOM, not just hidden — we
+        // don't want the user's next Tab to land on an invisible button.
+        poster.addEventListener('click', () => {
+          const ytId = poster.dataset.ytId;
+          const ytTitle = poster.dataset.ytTitle || 'YouTube video';
+          // Build the iframe + loader as siblings inside `wrap` (the
+          // poster's parent). replaceWith below moves the iframe into
+          // the poster's slot — the loader stays where buildYoutubeIframe
+          // appended it, also inside wrap, right next to the iframe.
+          const iframe = buildYoutubeIframe(ytId, ytTitle, wrap);
+          poster.replaceWith(iframe);
+          // Now that the iframe exists, the page-pause walk can run.
+          // Same defer-to-load pattern as the immediate-iframe path below.
+          const doPause = () => pausePageForPlayback();
+          iframe.addEventListener('load', doPause, { once: true });
+          setTimeout(doPause, 1200);
+        }, { once: true });
+        wrap.appendChild(poster);
+      } else {
+        // IMMEDIATE-IFRAME PATH (legacy callers, e.g. direct video URLs
+        // and any caller that didn't pass a thumbnail). Same as before
+        // — iframe is built right now and the page-pause walk is
+        // deferred until it fires `load`.
+        buildYoutubeIframe(videoOrYoutubeId, title, wrap);
+      }
     } else {
       // Direct video URL (mp4, webm, etc.)
       const v = document.createElement('video');
@@ -429,17 +503,42 @@ function openLightbox(title, videoOrYoutubeId) {
   // click-outside-to-close, and ARIA for free.
   lightbox.showModal();
   document.body.style.overflow = 'hidden';
-  // Defer the pausePageForPlayback walk by one frame so the dialog
-  // paints first. The walk does `document.querySelectorAll('body *')`
-  // + `el.getAnimations({ subtree: true })` on every node, which on
-  // a busy page can take 100-400ms — long enough that the click feels
-  // unresponsive if it runs synchronously inside the click handler.
-  // Running it in the next frame lets showModal() return, the dialog
-  // paint, and the YouTube iframe start loading before the walk
-  // begins. __pauseForPlayback is set INSIDE the walk, so the
-  // tilt/magnet loop will run for exactly one extra frame (~16ms)
-  // after the click — negligible.
-  requestAnimationFrame(() => pausePageForPlayback());
+  // Defer pausePageForPlayback until the iframe fires `load`, so the
+  // page-pause walk (which does `document.querySelectorAll('body *')`
+  // + `el.getAnimations({ subtree: true })` on every node — ~100-400ms
+  // on a busy page) doesn't block the main thread during the click-to-
+  // first-paint window. The video decoder is competing for the same
+  // main thread; the walk loses to it.
+  //
+  // If we never reach the iframe branch (direct video URL or "coming
+  // soon"), fall through to a setTimeout so the walk still happens
+  // shortly after the dialog opens — better to pause 100ms late than
+  // never. The 1.2s fallback is a safety net for the rare case where
+  // the iframe `load` event never fires (network blocked, ad-blocker
+  // rewriting the iframe, etc.) — at that point the video is unlikely
+  // to play, so we just pause to recover whatever CPU we can.
+  let didPause = false;
+  const doPause = () => {
+    if (didPause) return;
+    didPause = true;
+    pausePageForPlayback();
+  };
+  // Three cases:
+  //   1. Lite-embed poster in the wrap → user hasn't clicked play yet,
+  //      so the page-pause walk is wired up in the poster's own click
+  //      handler (above). Do nothing here.
+  //   2. Immediate iframe in the wrap → defer the walk until the
+  //      iframe fires `load`, with a 1.2s safety net.
+  //   3. Neither (direct video URL or "coming soon") → no iframe to
+  //      listen for, so pause on the next tick. Better late than never.
+  if (wrap.querySelector('.lightbox-poster')) {
+    // Lite-embed: the pause is owned by the poster's click handler.
+  } else if (wrap.querySelector('iframe')) {
+    wrap.querySelector('iframe').addEventListener('load', doPause, { once: true });
+    setTimeout(doPause, 1200);
+  } else {
+    setTimeout(doPause, 0);
+  }
 }
 
 function closeLightbox() {
@@ -606,7 +705,28 @@ window.closeLightbox = closeLightbox;
 document.querySelectorAll('.video-card').forEach((card) => {
   card.setAttribute('role', 'button');
   card.setAttribute('tabindex', '0');
-  const trigger = () => openLightbox(card.dataset.title || 'SHOWREEL', card.dataset.video || '');
+  const trigger = () => {
+    // If the card has a YouTubeEmbed inside it, prefer that component's
+    // own thumbnail + ID. The click already routed through YouTubeEmbed's
+    // document handler when the click was on the .yt-embed button itself
+    // (stopPropagation blocks us), so reaching this code means the user
+    // clicked somewhere else on the card — meta strip, NOW PLAYING badge,
+    // padding. We still want to open the same video, just via the lite-
+    // embed pattern (instant thumbnail, no 1-3s wait).
+    const ytEmbedBtn = card.querySelector('.yt-embed');
+    if (ytEmbedBtn) {
+      const ytId = ytEmbedBtn.dataset.ytId;
+      const ytTitle = ytEmbedBtn.dataset.ytTitle || card.dataset.title || 'SHOWREEL';
+      const thumbUrl = ytEmbedBtn.dataset.thumbUrl || '';
+      if (ytId) {
+        openLightbox(ytTitle, ytId, thumbUrl);
+        return;
+      }
+    }
+    // Fallback: no YouTubeEmbed inside (or it has no ID — "coming soon").
+    // Matches the pre-lite-embed behavior: show whatever the card declared.
+    openLightbox(card.dataset.title || 'SHOWREEL', card.dataset.video || '');
+  };
   card.addEventListener('click', (e) => {
     // Skip if the click was inside a YouTubeEmbed lite-button —
     // that handler (YouTubeEmbed.astro) opens the dialog itself and
