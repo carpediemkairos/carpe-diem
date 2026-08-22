@@ -364,34 +364,31 @@ function openLightbox(title, videoOrYoutubeId) {
       iframe.setAttribute('allowfullscreen', '');
       wrap.appendChild(iframe);
 
-      // Loading overlay — covers the iframe while YouTube's player
-      // boots. The YouTube embed has to fetch base.js + player.js +
-      // the playManifest before it paints a single frame, which on a
-      // typical connection is 1-3 seconds — without this the user
-      // just sees a black rectangle and assumes the click is broken.
-      // The overlay is a sibling of the iframe inside the relative
-      // `wrap`, positioned absolutely on top. Hidden when the iframe
-      // fires its `load` event (which fires when the embed document
-      // has parsed, not when playback has started — that's fine, the
-      // player's own loading spinner takes over from there).
+      // Loading bar — matches YouTube's own loading bar exactly
+      // (3px, #ff0000, bottom-flush, indeterminate slide). Shows
+      // while the iframe fetches base.js + player.js + playManifest
+      // before its first paint. Hidden on the iframe's `load` event.
+      // Why match YouTube's bar instead of our own spinner: the
+      // player takes over ~1-3s later with the same exact bar in
+      // the same exact position. A spinner would have to fade out
+      // and be replaced by the YouTube bar, which reads as a UI
+      // transition. Matching the bar reads as the player booting
+      // up — the same experience the user has on youtube.com.
       const loader = document.createElement('div');
       loader.className = 'lightbox-loader lightbox-loader--pending';
       loader.setAttribute('aria-hidden', 'true');
-      loader.innerHTML = `
-        <div class="lightbox-loader__spinner" aria-hidden="true"></div>
-        <p class="lightbox-loader__label font-orbitron">LOADING</p>
-      `;
+      loader.innerHTML = '<div class="lightbox-loader__bar" aria-hidden="true"></div>';
       wrap.appendChild(loader);
-      // After 120ms, if the iframe is still loading, fade the loader
+      // After 120ms, if the iframe is still loading, fade the bar
       // in. This avoids a flash when the iframe `load` event fires
-      // from browser cache (under ~100ms) — the loader never becomes
+      // from browser cache (under ~100ms) — the bar never becomes
       // visible, so a snappy open stays snappy.
       const showTimer = setTimeout(() => loader.classList.remove('lightbox-loader--pending'), 120);
       // Use a one-time `load` listener. `{ once: true }` auto-removes
       // it after firing so we don't leak handlers on repeat opens.
       // Fallback: if `load` never fires (network blocked, ad-blocker
-      // rewriting the iframe, etc.) the loader stays up to 8s, then
-      // we give up and let the user see whatever the iframe shows.
+      // rewriting the iframe, etc.) the bar stays up to 8s, then we
+      // give up and let the user see whatever the iframe shows.
       let loaderHidden = false;
       const hideLoader = () => {
         if (loaderHidden) return;

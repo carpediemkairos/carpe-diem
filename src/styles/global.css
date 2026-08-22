@@ -2111,22 +2111,28 @@ textarea.form-input { min-height: 120px; }
 /* Sits on top of the YouTube iframe while the player boots. The
    iframe has to fetch base.js + player.js + the playManifest before
    it can paint a single frame, which is 1-3s on a typical connection.
-   Without this overlay the user just sees a black rectangle. */
+   Without this overlay the user just sees a black rectangle.
+
+   Visual: a 3px red bar at the very bottom of the frame, sliding
+   left-to-right (indeterminate progress). Matches YouTube's own
+   loading bar exactly — same color (#ff0000), same height, same
+   bottom-flush position — so the transition into the YouTube player
+   feels like one continuous system, not "our spinner" handing off
+   to "their player." */
 .lightbox-loader {
     position: absolute;
-    inset: 0;
-    z-index: 5;            /* above the iframe (which has no z-index), below .lightbox-close (z-index 10) */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    background: #000;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;            /* matches YouTube's player loading bar */
+    z-index: 5;             /* above the iframe, below .lightbox-close (z-index 10) */
+    background: rgba(255, 0, 0, 0.15);  /* dim red track — same as YouTube */
+    overflow: hidden;
+    pointer-events: none;   /* never block clicks on the iframe */
     /* Fade out when the iframe fires `load`. The transition is on
        the loader, not the iframe, so the iframe's first paint is
        not delayed by compositor work on top of it. */
     transition: opacity 0.2s ease;
-    pointer-events: none;  /* never block clicks on the iframe */
     opacity: 1;
 }
 /* .lightbox-loader--pending starts the loader hidden. JS removes
@@ -2138,28 +2144,21 @@ textarea.form-input { min-height: 120px; }
 .lightbox-loader--hidden {
     opacity: 0;
 }
-.lightbox-loader__spinner {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    /* 2px ring with the top quarter being the cyan accent, the rest
-       a low-opacity white. Spins via the conic gradient + mask trick
-       so we don't need an SVG or a 3rd-party animation. */
-    background: conic-gradient(from 0deg, rgba(0, 242, 254, 0.95) 0deg, rgba(0, 242, 254, 0.95) 90deg, rgba(255, 255, 255, 0.15) 90deg, rgba(255, 255, 255, 0.15) 360deg);
-    -webkit-mask: radial-gradient(circle, transparent 18px, #000 19px);
-            mask: radial-gradient(circle, transparent 18px, #000 19px);
-    animation: lightboxLoaderSpin 0.9s linear infinite;
+/* The moving fill. 35% of the bar's width, sliding from -35% to 100%
+   in 1.2s, looping. Same indeterminate motion as YouTube's bar. */
+.lightbox-loader__bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 35%;
+    background: #ff0000;    /* exact YouTube red */
+    animation: lightboxLoaderSlide 1.2s ease-in-out infinite;
     will-change: transform;
 }
-@keyframes lightboxLoaderSpin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-}
-.lightbox-loader__label {
-    font-size: 0.7rem;
-    letter-spacing: 0.3em;
-    color: rgba(255, 255, 255, 0.6);
-    margin: 0;
+@keyframes lightboxLoaderSlide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(385%); }   /* 100% / 35% ≈ 285% past the right edge, rounded up */
 }
 
 
