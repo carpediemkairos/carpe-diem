@@ -16,12 +16,17 @@ interface Props {
   // Optional: render in compact mode (smaller play button). Useful for
   // tight grids; matches the existing .portfolio-thumb aspect ratio.
   compact?: boolean;
-  // Optional: pick the YouTube thumbnail variant. The Cinematic Showreel's
-  // featured card needs the full-resolution 1280×720 cover (it's ~1100px
-  // wide on desktop and would look soft with mqdefault). Secondary cards
-  // (~560px wide) are fine on mqdefault — half the bytes, same visual.
+  // Optional: pick the YouTube thumbnail variant.
   //   'high' (default) → maxresdefault.jpg  (1280×720, ~231 KB)
   //   'low'            → mqdefault.jpg      (320×180,  ~23 KB)
+  //
+  // When to use 'low': the card is displayed under ~600px wide (mobile, or
+  // compact secondary tiles in any layout). At that size mqdefault is
+  // visually identical to maxresdefault and saves ~210 KB per embed. The
+  // Hero passes resolution="low" to the mobile featured card for this
+  // reason; the desktop featured card stays on 'high' because it renders
+  // at ~1100px+ and would look soft on mqdefault.
+  //
   // YouTube returns a 120×90 placeholder when maxres isn't available, so
   // 'high' degrades gracefully to the same image 'low' would have served.
   resolution?: 'high' | 'low';

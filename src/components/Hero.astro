@@ -185,7 +185,7 @@ const narrativeWorkDuration = '07:10';
             <div class="video-card__grain" aria-hidden="true"></div>
             <div class="video-card__vignette" aria-hidden="true"></div>
 
-            <YouTubeEmbed videoId={featuredReelId} title="Featured Reel 2026" compact={false} />
+            <YouTubeEmbed videoId={featuredReelId} title="Featured Reel 2026" compact={false} resolution="low" />
 
             <!-- NOW PLAYING badge -->
             <div class="video-card__badge">
@@ -280,6 +280,11 @@ const narrativeWorkDuration = '07:10';
                Step 6: same YouTubeEmbed lite-embed as mobile — same ID
                wired in via featuredReelId. Zero duplication needed. -->
           <div class="md:col-span-2 video-card video-card--featured video-card--yt aspect-video relative group" data-title="Featured Reel 2026">
+            <!-- Desktop keeps the full maxresdefault.jpg (~231 KB) — at 1100px+
+                 wide on desktop it would look noticeably soft on mqdefault.
+                 Mobile (line 188) uses resolution="low" because the card is
+                 only ~340px wide there, where mqdefault is identical visually
+                 and saves ~210 KB. -->
             <YouTubeEmbed videoId={featuredReelId} title="Featured Reel 2026" compact={false} />
             <div class="video-card__grain" aria-hidden="true"></div>
             <div class="video-card__vignette" aria-hidden="true"></div>
