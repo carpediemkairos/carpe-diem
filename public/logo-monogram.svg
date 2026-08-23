@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="CD monogram">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="48%" r="50%">
+      <stop offset="0%" stop-color="#1a160f"/>
+      <stop offset="100%" stop-color="#040302"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff8de"/>
+      <stop offset="20%" stop-color="#fae5a0"/>
+      <stop offset="55%" stop-color="#5c3f12"/>
+      <stop offset="84%" stop-color="#ecc269"/>
+      <stop offset="100%" stop-color="#fff0bf"/>
+    </linearGradient>
+    <filter id="carve">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="b"/>
+      <feOffset in="b" dx="0" dy="3" result="o"/>
+      <feFlood flood-color="#000" flood-opacity="0.6"/>
+      <feComposite in2="o" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="100" fill="url(#bg)"/>
+  <g filter="url(#carve)" transform="translate(0, 22)" fill="url(#gold)" font-family="'Cormorant Garamond','Playfair Display',serif" font-weight="400">
+    <text x="86" y="118" text-anchor="middle" font-size="108">C</text>
+    <text x="118" y="115" text-anchor="middle" font-size="76">D</text>
+  </g>
+</svg>
