@@ -860,6 +860,29 @@
   .back-to-top svg { display: block; }
 
   /* ============================================================
+     MOBILE-ONLY ANIMATION CUTS (Step 10, 2026-08-24)
+     The footer brand mark .grad-cyan / .grad-purple / .grad-white spans
+     each carry 6s + 8s holographic text animations (footer-mark-shimmer,
+     footer-mark-holo). Every frame the browser repaints the clipped
+     gradient text via background-position.
+
+     On a phone the footer scrolls into view once per session, but the
+     brand mark stays in view for the entire time the user reads the
+     columns — usually 10-30s of continuous repainting for an element
+     that's smaller than the navbar brand mark.
+
+     Drop the animations on mobile. The static gradient text reads
+     identical to the eye; the holo effect is decorative. Desktop keeps
+     the full holographic treatment. The .footer-mark text-shadow glow
+     stays (static, no animation cost).
+     ============================================================ */
+  @media (max-width: 640px) {
+    .footer-mark .grad-cyan,
+    .footer-mark .grad-purple,
+    .footer-mark .grad-white { animation: none !important; }
+  }
+
+  /* ============================================================
      REDUCED MOTION — keep color, drop movement/shimmer/sheen
      ============================================================ */
   @media (prefers-reduced-motion: reduce) {

@@ -749,6 +749,17 @@ body {
     100% { background-position: 0% 0%; }
 }
 
+/* Kill navbar brand mark holographic text on mobile — mirror of the rule
+   in Base.astro critical CSS. The base rule covers first paint, this
+   catches the stylesheet re-evaluation if the navbar markup is added later.
+   background-position changes repaint the clipped text every frame; the
+   navbar is always on screen, so this is a constant drain. */
+@media (max-width: 640px) {
+    .navbar-mark .grad-cyan,
+    .navbar-mark .grad-purple,
+    .navbar-mark .grad-white { animation: none !important; }
+}
+
 /* Reduced motion: keep the glass, drop the movement */
 @media (prefers-reduced-motion: reduce) {
     .navbar-glass { backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
@@ -892,6 +903,14 @@ a.badge-card:hover .badge-icon {
 @keyframes pulse {
     0%, 100% { transform: scale(1); opacity: 1; }
     50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+/* Status dot pulse — kill on mobile. The hero "Open for Booking" dot
+   pulses every 2s; on a small screen it sits above the fold and runs
+   constantly. Drop the animation; the static green dot still reads as
+   "online". Desktop keeps the live indicator. */
+@media (max-width: 640px) {
+    .status-dot { animation: none !important; }
 }
 
 .status-dot-sm {
@@ -1118,6 +1137,16 @@ a.badge-card:hover .badge-icon {
     0%   { box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7); }
     70%  { box-shadow: 0 0 0 8px rgba(0, 242, 254, 0); }
     100% { box-shadow: 0 0 0 0 rgba(0, 242, 254, 0); }
+}
+
+/* NOW PLAYING badge pulse — kill on mobile. The .video-card__pulse runs
+   a 1.8s expanding dot ripple on the featured showreel card. The featured
+   card is above the fold in the hero on small screens, so the ripple
+   runs continuously while the user is on the hero. Drop it on mobile —
+   the static cyan dot still reads as "live indicator". */
+@media (max-width: 640px) {
+    .video-card__pulse { animation: none !important; }
+    .video-card__pulse::after { animation: none !important; }
 }
 
 /* ---------- Play button ---------- */
@@ -2158,6 +2187,54 @@ footer h4 {
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ---- Step 10: drop filter:blur from reveal/stagger on mobile. ----
+   The .reveal helper applies `filter: blur(8px)` to every data-reveal
+   element and animates it to `blur(0)` when is-visible is added (via the
+   IntersectionObserver in /scripts/observer.js). The .stagger children
+   inherit a similar opacity + transform transition.
+
+   On a low-end Android, `filter: blur()` is one of the most expensive
+   GPU operations — it forces the browser to allocate a separate
+   compositor layer per element, and recompute the Gaussian blur on every
+   frame of the 0.9s transition. On the portfolio grid (24 cards each
+   carrying `animation: fadeInUp` AND `filter: blur(8px)`), this is 24
+   blurred layers animating to clear as they scroll in.
+
+   The mobile override keeps the opacity + transform (which are
+   compositor-only) and drops the blur entirely. The reveal still happens,
+   just without the blur-from-focus effect. The end state is identical —
+   the user just sees the element slide in instead of slide in while
+   defocusing.
+
+   IMPORTANT — selector scoping: each direction override uses
+   `:not(.is-visible)` so the rule has specificity 0,2,1 (class + class +
+   pseudo) vs the base `.reveal.is-visible` rule at 0,2,0. Without that,
+   the mobile rule wins on source order alone and pins the element at
+   its starting offset (translateY(20px), scale(0.96), etc.) even when
+   the observer adds `.is-visible`. The `:not(.is-visible)` form makes
+   the rule inert once `.is-visible` is on the element, so the base
+   `.reveal.is-visible` (transform: translate(0,0) scale(1)) takes over
+   and the animation completes normally. */
+@media (max-width: 640px) {
+    .reveal {
+        filter: none !important;
+        transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+                    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.is-visible {
+        filter: none !important;
+    }
+    /* Tighten the transform distance too — 40px translate on a 375px
+       viewport looks more dramatic than the same 40px on a 1440px screen.
+       Half-distance keeps the same proportional feel without overshooting
+       on small screens. */
+    .reveal:not(.is-visible)[data-reveal="up"]    { transform: translateY(20px); }
+    .reveal:not(.is-visible)[data-reveal="down"]  { transform: translateY(-20px); }
+    .reveal:not(.is-visible)[data-reveal="left"]  { transform: translateX(-20px); }
+    .reveal:not(.is-visible)[data-reveal="right"] { transform: translateX(20px); }
+    .reveal:not(.is-visible)[data-reveal="scale"] { transform: scale(0.96); }
+}
+
 /* .float-idle + @keyframes floatIdle removed 2026-08-04 (perf audit — unused) */
 
 /* Slow continuous glow pulse rule removed 2026-08-04 (perf audit — unused) */
@@ -2822,7 +2899,9 @@ header[id] {
         border-radius: 50%;
         background: var(--cyan);
         box-shadow: 0 0 8px rgba(0, 242, 254, 0.7);
-        animation: badgePulse 1.8s ease-out infinite;
+        /* Pulse was disabled on mobile — the dot sits in the hero showreel
+           chip and runs while the hero is visible. Static dot reads the
+           same. Re-enable here if the cinematic flourish is wanted back. */
     }
 
     /* ============================================================
