@@ -192,65 +192,6 @@ const thumbUrl = videoId
     iframe.setAttribute('data-yt-embed-original-btn', btn.outerHTML);
     btn.replaceWith(iframe);
 
-    // Show a short HD-quality hint over the player. YouTube's embed
-    // player does not let websites force a quality -- it picks 144p
-    // on throttled connections and there's nothing we can do about
-    // it from the parent page. The only reliable way for the viewer
-    // to get HD is to manually pick 720p / 1080p from the YouTube
-    // gear menu. This toast tells them that, in plain words, then
-    // fades out after 5s so it doesn't sit on top of the video.
-    //
-    // The hint is appended to the parent video card (so it sits over
-    // the iframe, not next to it) and uses pointer-events: none so
-    // it doesn't block clicks on the YouTube controls. A small close
-    // button on the right lets the user dismiss it earlier.
-    const videoCard = btn.closest('.video-card') || btn.parentElement;
-    if (videoCard) {
-      // Don't stack a second toast if one is already showing on this
-      // card (e.g. the user clicked a different video on the same
-      // card surface). Just reset the timer on the existing one.
-      const existing = videoCard.querySelector<HTMLElement>(':scope > .yt-hd-hint');
-      if (existing) existing.remove();
-      const hint = document.createElement('div');
-      hint.className = 'yt-hd-hint';
-      hint.setAttribute('role', 'status');
-      hint.setAttribute('aria-live', 'polite');
-      hint.innerHTML = `
-        <span class="yt-hd-hint__icon" aria-hidden="true">&#9881;</span>
-        <span class="yt-hd-hint__text">
-          <strong>Tip:</strong> tap the <span class="yt-hd-hint__gear">⚙</span> icon &rarr; <strong>Quality</strong> &rarr; <strong>720p / 1080p</strong> for HD.
-        </span>
-        <button type="button" class="yt-hd-hint__close" aria-label="Dismiss hint">&times;</button>
-      `;
-      videoCard.appendChild(hint);
-      // Fade in on next frame so the transition runs.
-      requestAnimationFrame(() => hint.classList.add('yt-hd-hint--visible'));
-      // Auto-dismiss after 5s.
-      const dismiss = () => {
-        hint.classList.remove('yt-hd-hint--visible');
-        window.setTimeout(() => hint.remove(), 350); // match CSS transition
-      };
-      const autoTimer = window.setTimeout(dismiss, 5000);
-      hint.querySelector('.yt-hd-hint__close')?.addEventListener('click', () => {
-        window.clearTimeout(autoTimer);
-        dismiss();
-      });
-      // Also dismiss the hint when the iframe is torn down (user
-      // clicked a different video, or scrolled it out of viewport
-      // and the auto-pause logic replaced it with the thumbnail).
-      // Without this, the hint would stay orphaned on the card
-      // surface and re-appear when the next video on that card is
-      // played.
-      const obs = new MutationObserver(() => {
-        if (!iframe.isConnected) {
-          window.clearTimeout(autoTimer);
-          dismiss();
-          obs.disconnect();
-        }
-      });
-      obs.observe(videoCard, { childList: true, subtree: true });
-    }
-
     // Mark the nearest portfolio card as "playing" so CSS can neutralize
     // the data-tilt transform on any ancestor that still has it (Hero
     // forms / Pipeline / Contact). Portfolio cards no longer carry
