@@ -1572,6 +1572,114 @@ a.badge-card:hover .badge-icon {
 }
 
 /* ========================================
+   YOUTUBE LITE EMBED (shared — Hero + Portfolio grid)
+   ========================================
+   These rules were originally scoped inside YouTubeEmbed.astro, but
+   PortfolioGrid.astro renders the same lite-embed button as a string
+   template via set:html (so the filter script can swap cards in
+   instantly without a network request). Scoped Astro styles are
+   rewritten to attribute selectors (e.g. `.yt-embed[data-astro-cid-xxx]`)
+   and only match elements the component renders itself — string-template
+   copies don't carry the scoping attribute, so the scoped rules never
+   applied and the red play SVG sat unpositioned in the DOM, hidden
+   behind the absolutely-positioned <img>. Moving the rules to the
+   global sheet lets both the component instance (Hero showreel) and
+   the string template (portfolio grid) pick them up.
+
+   Selector cost is identical-or-better here than the scoped form: a
+   single class match is faster than a class+attribute match, and
+   there's no cascade conflict because the rules only apply to the
+   .yt-embed namespace. The iframe-swap rules (the `<script>` block
+   in YouTubeEmbed.astro that swaps the button for an iframe on click)
+   don't depend on these styles and stay in the component. */
+.yt-embed {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* No aspect-ratio here on purpose. The parent .video-card / .portfolio-thumb
+       always provides the aspect ratio. If we set 16/9 on the embed too, the
+       embed's height is fixed by its width (16/9 of width), and when the
+       parent has a different ratio (e.g. 16/10 in the portfolio grid) the
+       browser centers the embed vertically — leaving empty space at the top
+       and bottom.
+
+       background-size: cover (not 100% 100%) preserves the 16:9 native
+       aspect ratio of the YouTube thumbnail. With 100% 100% the image
+       stretched to the parent box, which on non-16:9 cards (the showreel
+       secondary tiles are wider than 16/9 in the 2-col desktop grid and
+       slightly taller on the mobile 2-col grid) horizontally squashed
+       faces and text. cover crops a few pixels instead — never warps. */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #0a0a14;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: inherit;
+    transition: transform 0.3s ease;
+}
+.yt-embed:hover { transform: scale(1.02); }
+.yt-embed:focus-visible {
+    outline: 2px solid var(--cyan, #00f2fe);
+    outline-offset: 2px;
+}
+
+.yt-embed__play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease;
+}
+.yt-embed__play svg {
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
+    transition: transform 0.2s ease;
+}
+.yt-embed:hover .yt-embed__play svg { transform: scale(1.1); }
+
+.yt-embed--compact .yt-embed__play svg {
+    width: 48px;
+    height: 34px;
+}
+
+/* The iframe that gets swapped in after click — also global, since the
+   portfolio string template swaps iframes in too. */
+.yt-embed iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+/* Placeholder state when no video ID is set */
+.yt-placeholder {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--silver, #c0c0c0);
+    background: linear-gradient(135deg, rgba(10, 10, 20, 0.6), rgba(20, 20, 40, 0.4));
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: inherit;
+}
+.yt-placeholder__label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+/* ========================================
    PORTFOLIO GRID
    ======================================== */
 .portfolio-item {
