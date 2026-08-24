@@ -38,6 +38,10 @@
     --deep: #0a0a14;
     --cyan: #00f2fe;
     --purple: #7000ff;
+    /* --magenta — third accent for the Narrative Work title. Mirrors the
+       magenta token in tailwind.config.mjs so CSS var lookups match Tailwind
+       classes. Added 2026-08-24. */
+    --magenta: #ff3df0;
     --silver: #c0c0c0;
     --white: #ffffff;
     --green: #4ade80;
@@ -1200,7 +1204,12 @@ a.badge-card:hover .badge-icon {
     transform: translate(-50%, -50%) scale(1);
 }
 
-/* ---------- Meta overlay (bottom) ---------- */
+/* ---------- Meta overlay (bottom) ----------
+   Title sits bottom-center on every device (2026-08-24). The duration
+   pill is hidden via display:none on .video-card__duration, so the row
+   now contains only the title — `justify-content: center` lands it in
+   the visual middle of the card instead of left-justified against the
+   duration pill that used to balance the row. */
 .video-card__meta {
     position: absolute;
     left: 0;
@@ -1208,6 +1217,7 @@ a.badge-card:hover .badge-icon {
     bottom: 0;
     z-index: 5;
     padding: 1.4rem 1rem 1rem;
+    text-align: center;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.5) 50%, transparent 100%);
     pointer-events: none;
 }
@@ -1215,7 +1225,7 @@ a.badge-card:hover .badge-icon {
 .video-card__meta-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     gap: 0.75rem;
 }
 
@@ -1246,8 +1256,15 @@ a.badge-card:hover .badge-icon {
     background: rgba(255, 255, 255, 0.45);
 }
 
-/* ---------- Duration pill (bottom-right) ---------- */
+/* ---------- Duration pill (bottom-right) ----------
+   Hidden everywhere as of 2026-08-24 — the minute readout was
+   adding visual noise without telling the user anything the
+   meta label + thumbnail didn't already convey. The markup
+   (`.video-card__duration` spans in Hero.astro) is left in place
+   so the duration data stays recoverable; flip this rule back
+   on if you want the pills to return. */
 .video-card__duration {
+    display: none !important;
     font-family: 'JetBrains Mono', 'Menlo', monospace;
     font-size: 11px;
     letter-spacing: 0.05em;
@@ -2843,6 +2860,31 @@ header[id] {
         height: 18px;
     }
 
+    /* "PLAY NOW" badge — transparent + smaller on mobile. The desktop
+       default (line 1085) uses a black backdrop + border + cyan tint
+       which reads as a heavy UI chip on a phone card. On mobile we drop
+       the chip styling: transparent background, no border, no blur,
+       just a thin label hovering in the corner with a small dot. */
+    .video-card--cover .video-card__badge {
+        top: 0.65rem;
+        left: 0.65rem;
+        padding: 0.25rem 0.55rem 0.25rem 0.45rem;
+        gap: 0.35rem;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    .video-card--cover .video-card__badge .font-orbitron {
+        font-size: 9px;
+        letter-spacing: 0.22em;
+    }
+    .video-card--cover .video-card__pulse {
+        width: 6px;
+        height: 6px;
+    }
+
     /* Thinner letterbox bars — 4% instead of 7% */
     .video-card--cover .video-card__letterbox {
         height: 4%;
@@ -2853,16 +2895,26 @@ header[id] {
         display: none;
     }
 
-    /* Tighter meta label + smaller duration pill */
+    /* Hide the progress bar + credits line on the mobile cover card
+       (2026-08-24). Together with the meta-sub above, only the title
+       remains visible at the bottom-center. The markup (lines 220/223
+       in Hero.astro) is kept so the data is recoverable — flip these
+       two rules off if you want the progress / credits to return. */
+    .video-card--cover .video-card__progress,
+    .video-card--cover .video-card__credits {
+        display: none;
+    }
+
+    /* Tighter meta label — title font-size now comes from the Tailwind
+       `text-[9px] sm:text-sm` class on the span itself (line 209/311
+       in Hero.astro). Earlier this rule hard-coded 10px/0.1em here,
+       which clashed with the new smaller mobile size — removed 2026-08-24
+       so the Tailwind value is the single source of truth. */
     .video-card--cover .video-card__meta {
         padding: 1rem 0.85rem 0.85rem;
     }
     .video-card--cover .video-card__meta-row {
         gap: 0.5rem;
-    }
-    .video-card--cover .video-card__meta-row > span:first-child {
-        font-size: 10px;
-        letter-spacing: 0.1em;
     }
     .video-card--cover .video-card__duration {
         font-size: 10px;
@@ -2896,30 +2948,38 @@ header[id] {
     }
 
     /* ============================================================
-       Mobile secondary reels — 2-col grid (replaces old scroll rail,
-       removed 2026-08-12). The featured reel stays full-width on top;
-       these two tiles sit side-by-side below it. Tighter radius and
-       letterbox than the featured one so they read as supporting work,
-       not another hero. */
+       Mobile secondary reels — single column (full-width 16:9 tiles).
+       Was a 2-col grid (added 2026-08-12, removed 2026-08-24). At ~177px
+       wide on a 375px viewport the tiles were only ~100px tall — the
+       16:9 thumbnail got cropped hard by background-size: cover, faces
+       and titles clipped, and the meta labels crowded the play button.
+       Stacking full-width gives each tile ~211px of height, the thumbnail
+       renders cleanly, and the three videos read as a top-to-bottom reel
+       instead of one big cover with two tiny strips.
+       Desktop grid below is unchanged — the showreel-desktop-grid block
+       keeps the 2-col layout from md: up. */
     .showreel-secondary-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.7rem;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.85rem;
     }
     .video-card--grid {
         border-radius: 0.85rem;
     }
-    /* Slightly tighter letterbox on the grid tiles */
+    /* Letterbox bars — keep the mobile-tight 4% (matches the cover card)
+       so the three tiles feel like one reel, not three different framings. */
     .video-card--grid .video-card__letterbox {
-        height: 5%;
+        height: 4%;
     }
 
-    /* Slim meta label for the grid tiles — no sub-row, smaller text */
+    /* Slim meta label for the grid tiles — no sub-row, smaller text.
+       Slightly more horizontal padding now that the tiles are full-width;
+       keeps the label from butting up against the rounded corner. */
     .video-card__meta--grid {
-        padding: 0.55rem 0.7rem 0.65rem;
+        padding: 0.7rem 0.9rem 0.75rem;
     }
     .video-card__meta--grid .video-card__meta-row {
-        gap: 0.4rem;
+        gap: 0.5rem;
     }
 
     /* ============================================================
