@@ -2337,6 +2337,28 @@ footer h4 {
     .bg-grid-fine       { animation: none !important; }
 }
 
+/* ---- Step 11: kill the fixed grid drift on iPad-sized devices. ----
+   Step 9 above stopped the two grid animations on phones (≤640px). On
+   iPad mini / iPad / iPad Air (768-1366px) the same .bg-grid (40s
+   gridDrift) and .bg-grid-fine (60s gridDriftReverse) loops still paint
+   every frame. They're position: fixed, full-viewport layers — the
+   IntersectionObserver off-screen pause doesn't apply — so the iPad
+   GPU is recomputing background-position on two 4-layer gradient stacks
+   continuously. The grid sits under the showreel and competes with the
+   YouTube iframe decoder for compositor time.
+
+   Scoped to (min-width: 641px) and (max-width: 1366px) so the existing
+   mobile kill (≤640px) and desktop (≥1367px) are untouched. The aurora
+   is left running — it's the heaviest part of the iPad cinematic
+   background and the user can clearly see the rotation there, which is
+   the visual identity we want to preserve on tablets. The two grid
+   layers are decorative line work that reads identically when static.
+   The layers still render — only the drift stops. */
+@media (min-width: 641px) and (max-width: 1366px) {
+    .bg-grid      { animation: none !important; }
+    .bg-grid-fine { animation: none !important; }
+}
+
 /* ---- Step 2: stop the showreel featured-card conic border spin. ----
    The featured video card's rainbow ring is built from a conic-gradient
    masked with a 2px cutout, then rotated 360° every 8s. That is one of
@@ -2347,6 +2369,30 @@ footer h4 {
    is enough to starve the video decoder. The card keeps its cyan/purple
    border, its glow, and its drop shadow — only the rotation stops. */
 @media (max-width: 640px) {
+    .video-card--featured::before { animation: none !important; }
+}
+
+/* ---- Step 12: stop the showreel featured-card conic border spin on iPad. ----
+   Step 2 above stopped .video-card--featured::before on phones (≤640px).
+   On iPad mini / iPad / iPad Air (768-1366px) the same 8s reelBorderSpin
+   still runs — full conic-gradient re-rasterization + 2px mask composite
+   on the biggest card in the showreel section, sitting right where the
+   YouTube player loads on click. Same paint-cost pattern as the phone
+   cut, same fix.
+
+   Scoped to (min-width: 641px) and (max-width: 1366px) so the existing
+   mobile kill (≤640px) and desktop (≥1367px) are untouched. The static
+   conic border still shows — only the rotation stops.
+
+   Notes on what we deliberately do NOT touch:
+   - .video-card--cover::before (line ~2947) is inside a separate
+     @media (max-width: 767px) rule for the mobile cover card, so it
+     doesn't apply to iPad-sized viewports anyway.
+   - .video-card--featured:hover::before slows the spin on hover (line
+     ~1010). Pausing the base animation makes this hover rule inert on
+     iPad, which is the right outcome — touch devices don't fire
+     :hover reliably, and on iPad even desktop hover is uncommon. */
+@media (min-width: 641px) and (max-width: 1366px) {
     .video-card--featured::before { animation: none !important; }
 }
 
