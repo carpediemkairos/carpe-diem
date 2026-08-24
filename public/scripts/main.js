@@ -64,13 +64,24 @@ if (!reduceMotion && hasFinePointer) {
     const entry = { el, type: 'tilt', max, dirty: false, reset: false };
     animated.push(entry);
 
+    // If the card is currently playing a YouTube iframe (YouTubeEmbed.astro
+    // sets data-playing-embed on click), drop the tilt effect entirely.
+    // The rotateY component exposes the iframe's rectangular edges as a
+    // thin vertical seam against the card's rounded outline while the
+    // video plays. The CSS override below resets the inline transform;
+    // here we just refuse to schedule new frames for that element so the
+    // inline style doesn't keep overwriting the CSS reset.
+    const skipTilt = () => el.hasAttribute('data-playing-embed');
+
     el.addEventListener('mousemove', (e) => {
+      if (skipTilt()) return;
       const r = el.getBoundingClientRect();
       entry._x = (e.clientX - r.left) / r.width  - 0.5;
       entry._y = (e.clientY - r.top)  / r.height - 0.5;
       entry.dirty = true;
     });
     el.addEventListener('mouseleave', () => {
+      if (skipTilt()) return;
       entry.reset = true;
       entry.dirty = true;
     });
@@ -149,6 +160,91 @@ if (navbar) {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 }
+
+// -------- Auto-pause playing videos when scrolled out of viewport --------
+// Videos keep playing while the user can see them, but pause the moment
+// the iframe scrolls off-screen. We use IntersectionObserver rather than
+// a scroll listener because IO gives us a single source of truth ("the
+// element is/isn't visible") without polling getBoundingClientRect on
+// every frame. A scroll listener would also work but would fire
+// hundreds of times per scroll gesture.
+//
+// The observer is created lazily — only when the first iframe is swapped
+// in — because it's pointless to have one watching nothing. YouTubeEmbed.astro
+// (the click handler that creates the iframes) calls
+// window.__observePlayingIframe(iframe) on every swap. When the iframe
+// leaves the viewport, we restore the original thumbnail button using
+// the same data-yt-embed-original-btn attribute the click handler
+// stores. Removing the iframe tears down the YouTube player session —
+// just blanking src isn't enough, the audio keeps playing in the
+// background. The user can click the restored thumbnail again to
+// replay from the start.
+//
+// Threshold 0 with a small rootMargin bottom inset so an iframe that's
+// 90% visible (just the bottom edge clipped by the viewport edge) still
+// counts as "in view" — pausing at the very first pixel off-screen feels
+// too aggressive when the user is just nudging the scroll.
+window.__restoreIframeToThumb = (iframe) => {
+  const originalBtn = iframe.getAttribute('data-yt-embed-original-btn');
+  const parent = iframe.parentElement;
+  const oldCard = iframe.closest('[data-project-card], .video-card');
+  if (oldCard) oldCard.removeAttribute('data-playing-embed');
+  if (parent && originalBtn) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = originalBtn.trim();
+    const restoredBtn = tpl.content.firstElementChild;
+    if (restoredBtn) parent.replaceChild(restoredBtn, iframe);
+  } else if (parent) {
+    iframe.remove();
+  }
+};
+
+let viewportObserver = null;
+window.__observePlayingIframe = (iframe) => {
+  if (!viewportObserver) {
+    viewportObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        // When the iframe is no longer intersecting the viewport, restore
+        // the thumbnail. We don't need to do anything when it re-enters
+        // because the iframe is already gone by then — the user has to
+        // click the (restored) thumbnail again to start playback.
+        if (!entry.isIntersecting) {
+          const iframe = entry.target;
+          // The observer may still hold a reference to an iframe that
+          // was already restored by the click handler (e.g. user started
+          // a new video on a different card). Check that it's still in
+          // the DOM and still has the marker before touching it.
+          if (iframe.isConnected && iframe.hasAttribute('data-yt-embed-iframe')) {
+            viewportObserver.unobserve(iframe);
+            window.__restoreIframeToThumb(iframe);
+          } else {
+            viewportObserver.unobserve(iframe);
+          }
+        }
+      }
+    }, {
+      // Pause when ANY part of the iframe leaves the viewport. We use a
+      // negative top/bottom rootMargin so the iframe is considered "out"
+      // before it actually leaves — feels more responsive to the user's
+      // eye than waiting for the last pixel to scroll off.
+      rootMargin: '0px 0px 0px 0px',
+      threshold: 0,
+    });
+    // Expose the observer so YouTubeEmbed.astro can unobserve iframes
+    // it tears down (e.g. when the user starts a new video on a
+    // different card — the old iframe is replaced with a thumbnail
+    // before the observer has a chance to fire on it).
+    // Plain JS assignment — main.js is a raw .js file in public/scripts/
+    // and is served as-is (no TS compilation), so we can't use the
+    // `(window as unknown as { ... }).x = ...` syntax that works inside
+    // an Astro <script> block. Using it here would throw a SyntaxError
+    // on parse, halt the whole script, and silently break every feature
+    // main.js sets up (reveal-on-scroll observer, navbar scrolled state,
+    // tilt, smooth scroll, contact form, etc.).
+    window.__viewportObserver = viewportObserver;
+  }
+  viewportObserver.observe(iframe);
+};
 
 // -------- Start a Project: focus the Main Category dropdown after scroll --------
 // When the user clicks the Hero "Start a Project" CTA, smoothly scroll to the

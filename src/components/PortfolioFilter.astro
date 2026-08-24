@@ -92,7 +92,16 @@
     const attachCardListeners = () => {
       grid!.querySelectorAll<HTMLElement>('[data-project-card]').forEach((card) => {
         const trigger = (e: Event) => {
-          e.stopPropagation(); // don't double-fire if click also reaches YouTubeEmbed
+          // Skip if the click was inside a YouTubeEmbed lite-button.
+          // YouTubeEmbed.astro's document-level handler swaps the button
+          // for an iframe and calls stopPropagation. Belt-and-braces guard
+          // so this listener doesn't ALSO call .click() on the button —
+          // that would dispatch a synthetic click event that bubbles back
+          // up to THIS same listener and recurses forever (the user sees
+          // a frozen tab and no video plays). The same guard exists on
+          // .video-card in main.js — see that file for the matching case.
+          if ((e.target as HTMLElement).closest('.yt-embed')) return;
+          e.stopPropagation();
           // If the card has a YouTubeEmbed inside it, dispatch a click on
           // the .yt-embed button. The shared handler in YouTubeEmbed.astro
           // swaps the button for an inline YouTube iframe — no lightbox.

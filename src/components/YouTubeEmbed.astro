@@ -203,6 +203,51 @@ const thumbUrl = videoId
     const title = btn.dataset.ytTitle || 'YouTube video';
     if (!id) return; // placeholder has no video — let the card handler show "coming soon"
 
+    // Stop any other video that was swapped in earlier by this same
+    // handler. Without this, the user can play the showreel AND a
+    // portfolio card AND another portfolio card, all at once — three
+    // YouTube players running simultaneously, overlapping audio. The
+    // fix: walk every [data-yt-embed-iframe] we previously created and
+    // replace it with its original button markup (stored on the iframe
+    // in data-yt-embed-original-btn before the swap). Setting the
+    // iframe's src to about:blank isn't enough — the YouTube player
+    // keeps running in the background until the iframe is unloaded.
+    // Removing the iframe entirely tears down the player immediately.
+    //
+    // The restore logic is shared with main.js's
+    // window.__restoreIframeToThumb — defined there because the
+    // IntersectionObserver that auto-pauses out-of-viewport videos
+    // also needs to call it. We attach the iframe to the observer
+    // below, so the observer will pick it up when it leaves the
+    // viewport and call the same restore function.
+    document.querySelectorAll<HTMLElement>('[data-yt-embed-iframe]').forEach((oldIframe) => {
+      // Drop the old iframe from the viewport observer before tearing
+      // it down — otherwise the observer will fire one more time on
+      // a node that no longer matters. The observer checks
+      // isConnected + hasAttribute('data-yt-embed-iframe') defensively,
+      // but unobserve is cheaper than the check + skip.
+      const w = window as unknown as { __viewportObserver?: IntersectionObserver };
+      if (w.__viewportObserver) w.__viewportObserver.unobserve(oldIframe);
+      if (typeof (window as unknown as { __restoreIframeToThumb?: (el: HTMLElement) => void }).__restoreIframeToThumb === 'function') {
+        (window as unknown as { __restoreIframeToThumb: (el: HTMLElement) => void }).__restoreIframeToThumb(oldIframe);
+      } else {
+        // Fallback if main.js hasn't loaded yet (very early click):
+        // inline the same restore logic.
+        const originalBtn = oldIframe.getAttribute('data-yt-embed-original-btn');
+        const parent = oldIframe.parentElement;
+        const oldCard = oldIframe.closest('[data-project-card], .video-card');
+        if (oldCard) oldCard.removeAttribute('data-playing-embed');
+        if (parent && originalBtn) {
+          const tpl = document.createElement('template');
+          tpl.innerHTML = originalBtn.trim();
+          const restoredBtn = tpl.content.firstElementChild;
+          if (restoredBtn) parent.replaceChild(restoredBtn, oldIframe);
+        } else if (parent) {
+          oldIframe.remove();
+        }
+      }
+    });
+
     // Build the iframe in-place so the YouTube player fills the same
     // box the thumbnail was filling — same .yt-embed styles (position:
     // absolute, inset: 0) so it sizes to whatever the parent card is.
@@ -216,6 +261,36 @@ const thumbUrl = videoId
     iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');
     iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;display:block;border-radius:inherit;background:#000;';
+    // Mark the iframe so we can find it later (see the cleanup loop
+    // above) and stash the original button's outerHTML so we can
+    // restore the thumbnail when this video gets replaced.
+    iframe.setAttribute('data-yt-embed-iframe', '');
+    iframe.setAttribute('data-yt-embed-original-btn', btn.outerHTML);
     btn.replaceWith(iframe);
+
+    // Mark the nearest portfolio card as "playing" so CSS can neutralize
+    // the data-tilt transform on it. The tilt JS keeps writing
+    // `transform: perspective(900px) rotateX(...) rotateY(...)` to
+    // .style on mousemove, which rotates the card and exposes the
+    // iframe's rectangular edges as a thin vertical line on the
+    // left/right while the user hovers a playing video. Once we mark
+    // the parent, the CSS rule `body:has([data-playing-embed]) [data-tilt]`
+    // (below) zeroes that transform via a high-specificity override.
+    // The showreel cards don't have data-tilt, so this is a no-op there.
+    const card = btn.closest('[data-project-card], .video-card');
+    if (card) {
+      card.setAttribute('data-playing-embed', '');
+    }
+
+    // Register the iframe with the viewport observer in main.js so it
+    // pauses (and reverts to thumbnail) the moment it scrolls out of
+    // view. Without this the audio keeps playing in the background
+    // even though the user can't see the video. main.js exposes
+    // __observePlayingIframe lazily — created on first call so a page
+    // with no playing videos pays zero IntersectionObserver cost.
+    const w = window as unknown as { __observePlayingIframe?: (el: HTMLElement) => void };
+    if (typeof w.__observePlayingIframe === 'function') {
+      w.__observePlayingIframe(iframe);
+    }
   });
 </script>

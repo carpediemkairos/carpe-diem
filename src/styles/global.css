@@ -1610,6 +1610,17 @@ a.badge-card:hover .badge-icon {
     aspect-ratio: 16 / 9;
     overflow: hidden;
     background: var(--deep);
+    /* Inherit the card's top corners. The card has border-radius: 1.25rem
+       and overflow: hidden, so the thumb's square corners were already being
+       clipped — but only by the card. The iframe that gets swapped in for
+       the .yt-embed button on click has its own hard pixel edges; without
+       this radius the iframe's top corners sat flush against the card's
+       curved outline and produced a thin vertical seam on the left/right
+       when the card tilted on hover (data-tilt=8). Inheriting the radius
+       makes the iframe pick up the same clip path as the thumbnail img. */
+    border-radius: inherit;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
 }
 
 .portfolio-thumb img,
@@ -1618,6 +1629,17 @@ a.badge-card:hover .badge-icon {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    /* Rounded top corners on the swapped-in iframe so it follows the same
+       outline as the static thumbnail image. The .portfolio-thumb has
+       border-radius: inherit (with bottom corners zeroed) so the iframe
+       picks up the card's curve at the top. display: block kills the
+       inline-element descender gap that can show as a 1-2px line below
+       the iframe; background: #000 covers the brief moment between swap
+       and YT paint. */
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    display: block;
+    background: #000;
     /* Transitions on the thumb image are desktop-only too — see the
        @media (hover: hover) block below. The transition machinery is
        pre-allocated for every card on every device, even though touch
@@ -1711,6 +1733,19 @@ a.badge-card:hover .badge-icon {
     .portfolio-item:hover .portfolio-thumb iframe {
         transform: none;
         filter: none;
+    }
+    /* Once a portfolio card is playing a YouTube iframe, neutralize the
+       data-tilt transform on the card itself. main.js sets
+       `data-playing-embed` on the card right after the iframe swaps in;
+       the inline `transform: perspective(900px) rotateX(...) rotateY(...)`
+       style that the tilt loop writes on mousemove would otherwise rotate
+       the card and reveal the iframe's rectangular edges as a vertical
+       seam along the rounded outline. We override the inline transform
+       here; the JS also stops scheduling tilt frames for the playing card
+       so the inline style doesn't keep clobbering this rule. */
+    [data-project-card][data-playing-embed],
+    .video-card[data-playing-embed] {
+        transform: none !important;
     }
     /* The .portfolio-thumb::after / ::before pseudo play-button rules
        used to live here — they hid the overlay by default and re-shown
