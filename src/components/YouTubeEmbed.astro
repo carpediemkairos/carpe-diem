@@ -189,17 +189,8 @@ const thumbUrl = videoId
 </style>
 
 <script>
-  // Click handler — route every YouTube embed click through the shared
-  // <dialog> lightbox (window.openLightbox, defined in Base.astro).
-  //
-  // Why a dialog and not an inline iframe swap:
-  //   There used to be two click handlers running on the same click —
-  //   this one (which replaced the play button with an unsized iframe
-  //   in-place) and the .video-card handler in Base.astro (which opened
-  //   the dialog with an empty video). The result was a tiny unsized
-  //   inline iframe + the dialog backdrop stacked on top.
-  //   Routing through openLightbox() makes the dialog the single path
-  //   for every YouTube click on the site, full-screen and 16:9.
+  // Click handler — swap the play-button thumbnail for an inline iframe
+  // so the video plays in-place on the page (no lightbox / dialog).
   //
   // We use event delegation so one listener covers every .yt-embed on
   // the page (Hero cards, Portfolio filter cards, any future embeds).
@@ -212,27 +203,19 @@ const thumbUrl = videoId
     const title = btn.dataset.ytTitle || 'YouTube video';
     if (!id) return; // placeholder has no video — let the card handler show "coming soon"
 
-    // Preferred path: open the shared dialog. openLightbox() also accepts
-    // an 11-char YouTube ID and builds the right iframe + params (Base.astro:362-375).
-    // Pass the thumbnail URL (3rd arg) so the lightbox shows the thumbnail
-    // instantly via the lite-embed pattern, instead of waiting 1-3s for
-    // the YouTube player to boot from cold.
-    if (typeof (window as any).openLightbox === 'function') {
-      (window as any).openLightbox(title, id, btn.dataset.thumbUrl || '');
-      return;
-    }
-
-    // Fallback only — Base.astro's script hasn't run yet. Swap inline
-    // so the click is never dead. The iframe is sized to fill the card.
+    // Build the iframe in-place so the YouTube player fills the same
+    // box the thumbnail was filling — same .yt-embed styles (position:
+    // absolute, inset: 0) so it sizes to whatever the parent card is.
     const iframe = document.createElement('iframe');
-    // Same param set as Base.astro's openLightbox(). youtube.com (not
-    // nocookie) + no enablejsapi — see the comment in Base.astro for
-    // why those matter on Chrome-Android / Realme UI WebView builds.
+    // youtube.com (not nocookie) + no enablejsapi — see the comment in
+    // Base.astro for why those matter on Chrome-Android / Realme UI
+    // WebView builds. autoplay=1 starts playback the moment the iframe
+    // loads so the click feels immediate.
     iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
     iframe.title = title;
     iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');
-    iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;';
+    iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;display:block;border-radius:inherit;background:#000;';
     btn.replaceWith(iframe);
   });
 </script>

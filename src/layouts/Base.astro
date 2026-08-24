@@ -68,13 +68,13 @@ import { ViewTransitions } from 'astro:transitions';
   <link rel="preload" href="/images/profile.svg" as="image" type="image/svg+xml" fetchpriority="high" />
 
   <!-- Preconnect to YouTube before the user clicks play.
-       Step 8 (perf audit, 2026-08-05): the iframe only loads on click
-       (lite-embed pattern), but starting the DNS handshake + TCP/TLS
-       connection early makes the first click feel instant.
+       The YouTube iframe only loads on click (lite-embed pattern), but
+       starting the DNS handshake + TCP/TLS connection early makes the
+       first click feel instant.
        Note: We preconnect to youtube.com (NOT youtube-nocookie.com) —
-       openLightbox() now uses youtube.com/embed because the nocookie
-       domain stalls on Chrome-Android (Realme UI etc.). The CDN is
-       shared, so this preconnect also warms the video segments. -->
+       the nocookie domain stalls on Chrome-Android (Realme UI etc.).
+       The CDN is shared, so this preconnect also warms the video
+       segments. -->
   <link rel="preconnect" href="https://www.youtube.com" />
   <link rel="preconnect" href="https://i.ytimg.com" />
   <!-- yt3.ggpht.com: hosts channel avatars + init data the YouTube player
@@ -1089,8 +1089,8 @@ import { ViewTransitions } from 'astro:transitions';
   </style>
 
   <!-- The full global stylesheet (Portfolio, Pipeline, Contact, footer,
-       lightbox details, hover states, etc.) is imported in the <style
-       is:global> block below at the end of <body>. Astro emits it as a
+       hover states, etc.) is imported in the <style is:global> block
+       below at the end of <body>. Astro emits it as a
        <link rel="stylesheet"> there. The critical CSS inlined above is
        enough to render the first viewport (navbar + hero + first showreel
        card), so the browser doesn't need to wait for the full stylesheet
@@ -1141,46 +1141,6 @@ import { ViewTransitions } from 'astro:transitions';
   <main id="main">
     <slot />
   </main>
-
-  <!-- Lightbox — native <dialog> element (perf audit Step 14, 2026-08-05).
-       The browser handles ESC-to-close, focus trap, inert background,
-       click-outside-to-close, and screen reader announcements for free.
-       Opened via lightbox.showModal() in JS; closed via lightbox.close().
-       NOTE: do NOT add `fixed inset-0` here — the browser centers the
-       modal natively. `fixed inset-0` makes the dialog fill the whole
-       viewport, which puts the close button in a weird spot and squishes
-       the video to a corner. The actual sizing lives in #lightbox[open]
-       rules in global.css. -->
-  <dialog id="lightbox" class="bg-transparent p-0 m-0 max-w-none max-h-none" aria-label="Video player">
-    <div class="lightbox-frame">
-      <!-- Close button: small, anchored to the top-right of the frame.
-           Sized + positioned to sit in the dead space ABOVE YouTube's
-           own player controls (⚙ Settings / CC / theater mode) at the
-           very top-right of the iframe — not on top of them. The two
-           UIs now occupy different vertical bands of the same corner
-           instead of stacking on the same pixels. Real SVG X icon,
-           glass + backdrop-blur, gradient ring + glow on hover. CSS
-           handles hover/focus; JS auto-hides after 4s of mouse
-           inactivity on desktop (mobile keeps it always visible
-           because there's no hover state on touch). -->
-      <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close video player">
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-        </svg>
-      </button>
-
-      <!-- ESC hint: appears for 3s after the dialog opens, then fades. -->
-      <div id="lightbox-hint" class="lightbox-hint" aria-hidden="true">
-        <kbd class="lightbox-kbd">Esc</kbd>
-        <span>to close</span>
-      </div>
-
-      <div id="lightbox-content" class="w-full h-full flex items-center justify-center text-silver">
-        <p class="font-orbitron text-sm tracking-widest">SELECT A PROJECT TO PLAY</p>
-      </div>
-    </div>
-  </dialog>
 
   <!-- Toast -->
   <div id="toast" class="fixed bottom-6 right-6 z-[110] glass-panel rounded-2xl px-5 py-4 max-w-xs hidden" role="status" aria-live="polite">

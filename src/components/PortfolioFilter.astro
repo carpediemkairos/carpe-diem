@@ -4,8 +4,12 @@
 //   • track active main category + active sub filter
 //   • on click, swap the cards rendered inside #portfolio-grid
 //
-// No React, no hydration, ~1 KB of JS. Reuses window.openLightbox()
-// defined in Base.astro to open videos when a card is clicked.
+// No React, no hydration, ~1 KB of JS. The cards contain a
+// <button class="yt-embed"> which is swapped for an inline YouTube
+// iframe on click by the shared handler in YouTubeEmbed.astro — no
+// lightbox involved. The card-level click handler below routes to
+// that same .yt-embed button so a click anywhere on the card plays
+// the video inline.
 //
 // The cards themselves are pre-rendered server-side into a JSON island
 // (#portfolio-cards-data) keyed by (category, sub). This script just
@@ -38,11 +42,11 @@
         if (!btn.style.backgroundImage) {
           btn.style.backgroundImage = `url('${url}')`;
         }
-        // Intentionally do NOT remove data-thumb-url — openLightbox()
-        // reads it on click to render the lite-embed poster. Without it
-        // the lightbox would have to either re-derive the URL from the
-        // YouTube ID (works) or wait for the player to boot from cold
-        // (the slow behavior we're trying to eliminate).
+        // Intentionally do NOT remove data-thumb-url — the YouTubeEmbed
+        // click handler reads it when swapping the button for an inline
+        // iframe. Keeping the attribute as the source of truth means
+        // swapping in the iframe (which removes the data-thumb-url usage
+        // anyway) doesn't need to derive the URL again.
       };
 
       if (!('IntersectionObserver' in window)) {
@@ -88,31 +92,17 @@
     const attachCardListeners = () => {
       grid!.querySelectorAll<HTMLElement>('[data-project-card]').forEach((card) => {
         const trigger = (e: Event) => {
-          e.stopPropagation(); // don't let YouTubeEmbed.astro's document handler also call openLightbox()
-          const title = card.dataset.title || 'PROJECT';
-          const source = card.dataset.youtubeId || card.dataset.video || '';
-          // Single-click play for portfolio cards. The lite-embed pattern
-          // (thumbnail → play button) would force a second click before the
-          // video plays, which feels broken on small grid cards where users
-          // expect "click = play" — same as every other video thumbnail on
-          // the open web. We still get the perf wins from changes 1-3
-          // (preconnect, no vq=small, deferred page-pause walk) — only
-          // the lite-embed visual path is skipped here.
-          //
-          // Note: we deliberately do NOT pass a thumbnail URL (3rd arg
-          // stays empty). When openLightbox() receives no thumbnail, it
-          // builds the iframe immediately on click — the user sees the
-          // lightbox open with the YouTube player booting in place, same
-          // as the pre-2026-08-22 behavior on these cards.
-          if (typeof (window as any).openLightbox === 'function') {
-            (window as any).openLightbox(title, source);
-          } else {
-            const lightbox = document.getElementById('lightbox');
-            if (lightbox) {
-              lightbox.classList.remove('hidden');
-              lightbox.classList.add('flex');
-            }
+          e.stopPropagation(); // don't double-fire if click also reaches YouTubeEmbed
+          // If the card has a YouTubeEmbed inside it, dispatch a click on
+          // the .yt-embed button. The shared handler in YouTubeEmbed.astro
+          // swaps the button for an inline YouTube iframe — no lightbox.
+          const ytEmbedBtn = card.querySelector<HTMLElement>('.yt-embed');
+          if (ytEmbedBtn) {
+            ytEmbedBtn.click();
+            return;
           }
+          // No .yt-embed inside (placeholder / "coming soon" card):
+          // nothing to play. Do nothing.
         };
         card.addEventListener('click', trigger);
         card.addEventListener('keydown', (e) => {

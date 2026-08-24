@@ -30,17 +30,6 @@
     -webkit-backdrop-filter: none !important;
 }
 
-/* Strip the lightbox dialog backdrop blur too — this is the single
-   largest compositing cost while a video is playing. The dark overlay
-   (rgba(0,0,0,0.85)) still hides the page; we just skip the blur pass.
-   Also covers the universal ::backdrop selector in case a browser ever
-   scopes it to <html> instead of #lightbox. */
-.budget::backdrop,
-.budget #lightbox::backdrop {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
 /* ========================================
    DESIGN TOKENS
    ======================================== */
@@ -1023,6 +1012,21 @@ a.badge-card:hover .badge-icon {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+/* Secondary cards drop the scale on hover.
+   The base .video-card:hover applies `transform: translateY(-4px) scale(1.01)`,
+   which works fine for the static thumbnail + grain/vignette stack. But once
+   the user clicks play, YouTubeEmbed.astro swaps the thumbnail button for a
+   rectangular <iframe>. Scaling the iframe by 1.01 against a card with
+   border-radius: 1rem (16px) pushes the iframe's hard pixel edges through
+   the rounded corner clip region — the result is a visible vertical seam
+   on the left/right edges of the card while the video plays and the user
+   hovers. The featured card doesn't show this because its hover override
+   (line ~996) drops the scale and uses translateY-only.
+   We keep the lift + glow but remove the scale so the iframe stays flush. */
+.video-card--secondary:hover {
+    transform: translateY(-4px);
+}
+
 /* ---------- Media ---------- */
 .video-card__media {
     position: absolute;
@@ -1609,7 +1613,8 @@ a.badge-card:hover .badge-icon {
 }
 
 .portfolio-thumb img,
-.portfolio-thumb video {
+.portfolio-thumb video,
+.portfolio-thumb iframe {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -1620,6 +1625,20 @@ a.badge-card:hover .badge-icon {
        also makes the desktop effect feel more responsive. */
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.3s ease;
     transform: translateZ(0);
+}
+
+/* Inline-play mode (PortfolioFilter.astro → window.playInline).
+   The ::before and ::after pseudo play-button decorations are kept in
+   the DOM but forced hidden — the .yt-embed button inside the card
+   already renders its own SVG play icon, so the CSS overlay was
+   redundant. The hover rules below (which used to fade the pseudo
+   button in on hover) are now no-ops because the base opacity is 0
+   and pointer-events is none. */
+.portfolio-thumb:has([data-playing-embed])::before,
+.portfolio-thumb:has([data-playing-embed])::after {
+    opacity: 0;
+    transform: translate(-40%, -50%) scale(0.6);
+    transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .portfolio-thumb::after {
@@ -1637,12 +1656,11 @@ a.badge-card:hover .badge-icon {
         0 0 30px rgba(0, 242, 254, 0.6),
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
     transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-    transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    /* Permanently hidden — the .yt-embed SVG play icon is the only
+       play affordance. pointer-events: none keeps the overlay out of
+       the click target so it can't intercept the card click. */
+    opacity: 0;
     pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 .portfolio-thumb::before {
     content: "";
@@ -1655,10 +1673,9 @@ a.badge-card:hover .badge-icon {
     border-width: 0.5rem 0 0.5rem 0.85rem;
     border-color: transparent transparent transparent var(--space);
     transform: translate(-40%, -50%) scale(1);
-    opacity: 1;
-    transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    z-index: 2;
+    opacity: 0;
     pointer-events: none;
+    z-index: 2;
 }
 
 @media (hover: hover) {
@@ -1681,22 +1698,24 @@ a.badge-card:hover .badge-icon {
         transform: scale(1.1);
         filter: saturate(1.2) contrast(1.05);
     }
-    .portfolio-thumb::after {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.6);
+    /* Don't scale the iframe on hover. The transform: scale(1.1) on
+       <img>/<video> is fine because the image is a single bitmap the
+       browser rescales cleanly. The iframe is an opaque replaced
+       element containing the YouTube video; scaling it via CSS
+       transform is a compositor-level rescale of the iframe's box,
+       which produces a 1px sub-pixel artifact line (most often on
+       the right edge) on top of the playing video. The card-level
+       hover effect (border glow + box-shadow) still applies — that
+       is, the card frame lights up, but the video itself stays at
+       1.0 scale and unfiltered. */
+    .portfolio-item:hover .portfolio-thumb iframe {
+        transform: none;
+        filter: none;
     }
-    .portfolio-thumb::before {
-        opacity: 0;
-        transform: translate(-40%, -50%) scale(0.6);
-    }
-    .portfolio-item:hover .portfolio-thumb::after {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-    }
-    .portfolio-item:hover .portfolio-thumb::before {
-        opacity: 1;
-        transform: translate(-40%, -50%) scale(1);
-    }
+    /* The .portfolio-thumb::after / ::before pseudo play-button rules
+       used to live here — they hid the overlay by default and re-shown
+       it on hover. The overlay is now permanently hidden (see the base
+       rules above), so all those rules are dead. */
 }
 
 .portfolio-info {
@@ -1833,447 +1852,33 @@ textarea.form-input { min-height: 120px; }
     100% { box-shadow: 0 0 0 1px var(--cyan), 0 0 30px rgba(0, 242, 254, 0.4); }
 }
 
-/* ========================================
-   LIGHTBOX
-   ======================================== */
-/* Lightbox — native <dialog> (perf audit Step 14, 2026-08-05).
-   The browser adds the [open] attribute when showModal() is called
-   and removes it when close() runs. ::backdrop styles the inert
-   page behind the dialog.
-
-   Layout rules below:
-     - #lightbox[open] is the centered dialog box
-     - .lightbox-frame is the inner 16:9 video area
-     - #lightbox-close is a compact 32px button at the top-right of the
-       frame, sized + positioned to sit in the dead space above
-       YouTube's own player controls (⚙ / CC / theater) at the
-       iframe's top-right — not on top of them
-     - .video-card--yt hides the redundant .video-card__play SVG stack */
-#lightbox {
-    background: transparent;
-    color: inherit;
-    padding: 0;
-    border: 0;
-}
-
-#lightbox[open] {
-    /* The dialog is just a centered bounding box. We do NOT set both
-       width AND height here — that traps the .lightbox-frame inside a
-       non-16:9 box on small phones (a 343×607 dialog forces a tall
-       rectangle, not a 16:9 video). .lightbox-frame below owns the
-       aspect ratio entirely. */
-    position: fixed;
-    inset: 0;
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    /* Cap to the viewport so even heavy content can't escape the screen */
-    max-width: 100vw;
-    max-height: 100vh;
-    background: transparent;
-    /* No animation on the dialog itself — showModal() should be
-       instant. The previous opacity-only fade (0.12s) still delayed
-       the user's perception of the dialog opening by one paint frame.
-       The soft-entrance feel is now on the inner frame below (.lightbox-
-       frame), so the dialog appears immediately but the content still
-       fades in. */
-}
-
-#lightbox::backdrop {
-    /* Fully opaque black — the blurred 85% version let the page's
-       cyan/purple gradients bleed through the lightbox frame's
-       rounded corner cut-outs, producing a subtle greenish tint at
-       the corners against the frame's pure-black interior. With 100%
-       opacity the corners show pure black and match the frame. */
-    background: #000;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-}
-
-/* The 16:9 video frame. The dialog above is a centered bounding box;
-   this frame picks a width that fits both the viewport width AND the
-   viewport height at 16:9 (so on a short phone in landscape, the height
-   is the limiting factor, not the width — and the video stays 16:9).
-   aspect-ratio: 16/9 then derives the height automatically.
-
-   background is pure black (not var(--deep)). The iframe is a square
-   16:9; the parent's overflow:hidden + border-radius clips the
-   square corners into a rounded shape, leaving 4 tiny corner regions
-   that show the frame's background. YouTube's player is pure black,
-   so the corners blend with the video's own black bars / loading
-   state — with var(--deep) (#0a0a14) the corners had a subtle blue
-   tint that was visible against YouTube's #000. */
-.lightbox-frame {
-    position: relative;
-    /* Safe margins: 1rem on each side, no extra vertical allowance. */
-    width: min(
-        calc(100vw - 2rem),
-        calc(100vh * 16 / 9 - 2rem),
-        1024px
-    );
-    aspect-ratio: 16 / 9;
-    border-radius: 1rem;
-    overflow: hidden;
-    background: #000;
-    /* Soft entrance for the frame content. Applied to the inner frame
-       (not the <dialog>), so the dialog itself appears instantly on
-       showModal() and only the video area fades in. Opacity-only —
-       no transform — to avoid forcing a compositor layer on the
-       child iframe. 80ms is short enough to feel instant but long
-       enough to mask the YouTube embed's first-frame pop. */
-    animation: fadeIn 0.08s ease;
-    /* No border — a 1px white border on a rounded corner renders with
-       subpixel antialiasing that looks jagged/rough against the
-       smooth box-shadow glow. The shadow already defines the frame's
-       edge; the border was redundant and made the curve look less
-       smooth. */
-    box-shadow:
-        0 25px 60px -15px rgba(0, 0, 0, 0.7),
-        0 0 60px rgba(0, 242, 254, 0.18),
-        0 0 100px rgba(112, 0, 255, 0.18);
-}
-
-/* ============================================================
-   LIGHTBOX CLOSE BUTTON — in-frame, top-right, compact
-   ============================================================
-   32×32 hit target (smaller than the original 44 — the 44 was so big
-   it covered YouTube's own player controls). Real SVG X icon (14px),
-   glass + backdrop-blur, cyan→purple gradient ring + glow on hover.
-   The .idle class is added by JS after 4s of mouse inactivity on
-   desktop to fade the button out — it returns instantly on any mouse
-   move. Mobile keeps the button always visible (no hover state on
-   touch).
-
-   Why compact and not the original 44px: YouTube's player UI puts
-   the Settings (⚙) gear, CC, and theater-mode buttons in the top-
-   right of the iframe. A 44px close button at the same corner covered
-   them — clicking YouTube's settings was a coin flip between "open
-   settings" and "close the modal". A 32px close button at the very
-   top-right corner of the frame sits NEXT TO YouTube's controls in
-   the dead space they leave at the very top of the iframe (above
-   the ⚙ row), not on top of them. The two UIs now occupy the same
-   corner but different vertical bands.
-   ============================================================ */
-.lightbox-close {
-    position: absolute;
-    top: 0.15rem;
-    right: 0.1rem;
-    z-index: 2;
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    /* Background uses pure black (not var(--deep) at 55%) to blend
-       seamlessly with the YouTube player's #000 background. With the
-       blue-tinted rgba(5,5,12,0.55) the button created a visible
-       glass patch at the top-right corner of the frame against the
-       pure-black video — the tint was subtle but noticeable at the
-       corner. */
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(14px) saturate(180%);
-    -webkit-backdrop-filter: blur(14px) saturate(180%);
-    color: #ffffff;
-    cursor: pointer;
-    transition:
-        opacity 0.25s ease,
-        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-        border-color 0.25s ease,
-        box-shadow 0.3s ease,
-        background 0.25s ease;
-    box-shadow:
-        0 6px 18px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-/* Hover: lift, gradient ring via box-shadow, cyan glow */
-.lightbox-close:hover {
-    border-color: rgba(0, 242, 254, 0.6);
-    background: rgba(0, 242, 254, 0.12);
-    transform: scale(1.06);
-    box-shadow:
-        0 10px 28px rgba(0, 0, 0, 0.5),
-        0 0 0 1px rgba(0, 242, 254, 0.4),
-        0 0 24px rgba(0, 242, 254, 0.55),
-        0 0 48px rgba(112, 0, 255, 0.35),
-        inset 0 1px 0 rgba(255, 255, 255, 0.18);
-    color: var(--cyan);
-}
-
-/* Focus: same glow as hover, distinct outline for keyboard users */
-.lightbox-close:focus-visible {
-    outline: 2px solid var(--cyan);
-    outline-offset: 3px;
-    border-color: rgba(0, 242, 254, 0.6);
-    color: var(--cyan);
-}
-
-/* Active: scale down slightly for tactile feedback */
-.lightbox-close:active {
-    transform: scale(0.96);
-}
-
-/* Idle state — JS toggles .idle after 4s of no mouse movement on desktop.
-   The button fades to ~25% opacity and only re-appears on mouse move.
-   The transition makes it feel intentional, not glitchy. */
-.lightbox-close.idle {
-    opacity: 0.25;
-    transform: scale(0.94);
-}
-.lightbox-close.idle:hover {
-    opacity: 1;
-    transform: scale(1.06);
-}
-
-/* Touch devices: there is no hover/inactivity concept, so the button
-   stays fully opaque at all times. Detected via (hover: none) which is
-   the standard media query for "no hover-capable pointer". */
-@media (hover: none) {
-    .lightbox-close { opacity: 1; }
-    .lightbox-close.idle { opacity: 1; }
-}
-
-/* ============================================================
-   LIGHTBOX HINT — "Esc to close" pill, bottom-center, fades after 3s
-   ============================================================ */
-.lightbox-hint {
-    position: absolute;
-    left: 50%;
-    bottom: 1rem;
-    transform: translateX(-50%) translateY(0);
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.875rem;
-    border-radius: 999px;
-    background: rgba(5, 5, 12, 0.7);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: var(--silver);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    pointer-events: none;
-    opacity: 0;
-    animation: lightboxHintFade 3.6s ease forwards;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-}
-
-/* The <kbd> uses JetBrains Mono for a "control panel" look */
-.lightbox-kbd {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.75rem;
-    height: 1.5rem;
-    padding: 0 0.5rem;
-    border-radius: 0.375rem;
-    background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-bottom-width: 2px;
-    color: var(--white);
-    font-family: 'JetBrains Mono', 'Menlo', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
-}
-
-@keyframes lightboxHintFade {
-    0%   { opacity: 0; transform: translateX(-50%) translateY(8px); }
-    15%  { opacity: 1; transform: translateX(-50%) translateY(0); }
-    75%  { opacity: 1; transform: translateX(-50%) translateY(0); }
-    100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-}
-
-@media (max-width: 640px) {
-    /* Tighter safe margins on phones; close button stays at 32px
-       (compact by design — was 44px before, which covered YouTube's
-       own player controls at the iframe's top-right). */
-    .lightbox-frame {
-        width: min(
-            calc(100vw - 1.5rem),
-            calc(100vh * 16 / 9 - 1.5rem),
-            1024px
-        );
-    }
-}
-
-/* Extra-narrow phones (≤380px): no extra close-button shrinks; the
-   40px hit target already fits inside the safe area. */
-
-/* Landscape orientation on short phones (e.g. iPhone SE landscape, 667×375):
-   the viewport height is the limiting factor. The min() in .lightbox-frame
-   already handles this via the 100vh * 16/9 term. */
-
-
-/* ============================================================
-   LIGHTBOX LOADER
-   ============================================================ */
-/* Sits on top of the YouTube iframe while the player boots. The
-   iframe has to fetch base.js + player.js + the playManifest before
-   it can paint a single frame, which is 1-3s on a typical connection.
-   Without this overlay the user just sees a black rectangle.
-
-   Visual: a 3px red bar at the very bottom of the frame, sliding
-   left-to-right (indeterminate progress). Matches YouTube's own
-   loading bar exactly — same color (#ff0000), same height, same
-   bottom-flush position — so the transition into the YouTube player
-   feels like one continuous system, not "our spinner" handing off
-   to "their player." */
-.lightbox-loader {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 3px;            /* matches YouTube's player loading bar */
-    z-index: 5;             /* above the iframe, below .lightbox-close (z-index 10) */
-    background: rgba(255, 0, 0, 0.15);  /* dim red track — same as YouTube */
-    overflow: hidden;
-    pointer-events: none;   /* never block clicks on the iframe */
-    /* Fade out when the iframe fires `load`. The transition is on
-       the loader, not the iframe, so the iframe's first paint is
-       not delayed by compositor work on top of it. */
-    transition: opacity 0.2s ease;
-    opacity: 1;
-}
-/* .lightbox-loader--pending starts the loader hidden. JS removes
-   this class after 120ms only if the iframe `load` event hasn't
-   fired yet — so a snappy cached open never shows the loader. */
-.lightbox-loader--pending {
-    opacity: 0;
-}
-.lightbox-loader--hidden {
-    opacity: 0;
-}
-/* The moving fill. 35% of the bar's width, sliding from -35% to 100%
-   in 1.2s, looping. Same indeterminate motion as YouTube's bar. */
-.lightbox-loader__bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 35%;
-    background: #ff0000;    /* exact YouTube red */
-    animation: lightboxLoaderSlide 1.2s ease-in-out infinite;
-    will-change: transform;
-}
-@keyframes lightboxLoaderSlide {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(385%); }   /* 100% / 35% ≈ 285% past the right edge, rounded up */
-}
-
-
-/* ============================================================
-   LIGHTBOX LITE-EMBED PLAY OVERLAY
-   ============================================================ */
-/* Shown when openLightbox() is called with a thumbnail URL. The
-   thumbnail fills the frame and a big centered play button sits on
-   top — same UX as youtube.com's own embeds. Clicking the button
-   replaces the overlay with the YouTube iframe (autoplay=1, no
-   further click required). Until that click, NO YouTube JS loads —
-   the iframe doesn't exist in the DOM yet, so the page stays fast
-   and the video decoder isn't competing with anything.
-
-   Why not just embed the iframe and skip this: YouTube's player
-   fetches ~500 KB of JS + the playManifest before it can paint its
-   first frame, which is 1-3 seconds of staring at a black box on a
-   typical connection. Showing the already-loaded thumbnail instead
-   makes the open feel instant. */
-.lightbox-poster {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    background: #000;
-    /* `cursor: pointer` here (not on the inner play button) so the
-       cursor stays "pointer" everywhere on the poster — including
-       the dark letterbox bars if the thumbnail isn't true 16:9. */
-    cursor: pointer;
-    overflow: hidden;
-    border-radius: inherit;
-}
-.lightbox-poster__img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    /* YouTube's maxresdefault.jpg can take 200-400ms to load on first
-       visit. The poster is already instant from the user's POV (the
-       dialog opens, they see… a black box briefly if the image isn't
-       cached). A subtle zoom on load reads as "the thumbnail arrived"
-       instead of "the page is broken". Subtle on purpose — the click
-       target must stay obviously clickable, not feel like decoration. */
-    animation: lightboxPosterIn 0.35s ease-out;
-}
-@keyframes lightboxPosterIn {
-    from { opacity: 0; transform: scale(1.02); }
-    to   { opacity: 1; transform: scale(1); }
-}
-/* Centered play triangle. Big (~96px) so it's an obvious click target
-   on touch devices; uses the YouTube red rectangle silhouette so users
-   recognize it instantly. The white triangle on red is the same
-   contrast pair youtube.com uses for its own play buttons. */
-.lightbox-poster__play {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;     /* the .lightbox-poster button catches the click */
-    transition: transform 0.2s ease, filter 0.2s ease;
-    filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.6));
-}
-.lightbox-poster:hover .lightbox-poster__play {
-    transform: scale(1.08);
-}
-.lightbox-poster:focus-visible {
-    outline: 2px solid var(--cyan, #00f2fe);
-    outline-offset: -3px;     /* sit inside the rounded corners */
-}
-.lightbox-poster__play svg {
-    width: 96px;
-    height: 68px;
-}
-@media (max-width: 640px) {
-    /* Slightly smaller play triangle on phones — keeps it from
-       dominating the small frame on a 360px-wide viewport. */
-    .lightbox-poster__play svg {
-        width: 72px;
-        height: 50px;
-    }
-}
-
-
-/* Hide the redundant centered play icon when the card uses YouTubeEmbed.
-   That component already provides a click target with its own play SVG,
-   so the .video-card__play overlay underneath becomes visual noise and a
-   second stacked click target. Apply via the optional .video-card--yt
-   class on cards that embed a YouTubeEmbed. */
+/* Hide the redundant .video-card__play overlay on cards that already
+   embed a YouTubeEmbed — that component ships its own play button SVG,
+   so the overlay becomes visual noise + a second stacked click target.
+   Apply via the .video-card--yt class on the card root. */
 .video-card--yt .video-card__play {
     display: none;
 }
 
-@keyframes fadeIn {
-    /* Opacity-only on purpose. Adding `transform` here forces a
-       compositor layer on the dialog and its iframe, which delays
-       the first paint of the YouTube embed by ~100-200ms on low-end
-       phones. Opacity-only is composited on the GPU without a new
-       layer and lets the iframe start painting immediately. */
-    from { opacity: 0; }
-    to { opacity: 1; }
+/* ---------- Swapped-in YouTube iframe ----------
+   YouTubeEmbed.astro does `btn.replaceWith(iframe)` on click, so the
+   iframe becomes a direct child of `.video-card` with no class of its
+   own. The iframe's inline styles set position/inset/border but NOT
+   border-radius or overflow — the previous .yt-embed button had
+   `border-radius: inherit` + `overflow: hidden` so the thumbnail was
+   clipped to the rounded card corners.
+
+   Without those two properties the iframe is a sharp rectangle inside a
+   rounded card. On secondary cards (no featured ::before ring to hide
+   the edge) the seam shows up as a thin vertical line at the rounded
+   edge while the video plays — and gets worse on hover because
+   .video-card:hover applies `transform: scale(1.01)`, which sub-pixel-
+   aligns the rectangular iframe edge against the rounded card outline. */
+.video-card > iframe {
+    border-radius: inherit;
+    overflow: hidden;
+    display: block;          /* kills inline-element descender gap */
+    background: #000;        /* covers the brief moment before YT paints */
 }
 
 /* ========================================
