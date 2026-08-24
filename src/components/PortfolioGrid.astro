@@ -67,7 +67,12 @@ function renderCardHtml(item: CollectionEntry<'projects'>, i: number): string {
   // Escape attributes that go into HTML
   const safeTitle = String(title).replace(/"/g, '&quot;');
 
-  return `<article data-project-card data-category="${c}" data-sub-category="${s}" data-slug="${item.slug}" data-title="${safeTitle}" data-youtube-id="${youtubeId}" data-video="${video}" class="portfolio-item" style="animation-delay:${i * 60}ms" role="button" tabindex="0" data-tilt="8" aria-label="Open ${safeTitle}"><div class="portfolio-thumb">${thumbHtml}</div><div class="portfolio-info"><div class="portfolio-tags">${tagsHtml}</div><h3 class="portfolio-title">${title}</h3><p class="portfolio-desc">${desc}</p></div></article>`;
+  // data-tilt intentionally omitted: the user requested no 3D hover tilt
+  // on portfolio video cards. The tilt loop in main.js only acts on
+  // elements with [data-tilt], so removing the attribute disables the
+  // effect for portfolio cards without touching the Hero/Pipeline/Contact
+  // sections that keep it.
+  return `<article data-project-card data-category="${c}" data-sub-category="${s}" data-slug="${item.slug}" data-title="${safeTitle}" data-youtube-id="${youtubeId}" data-video="${video}" class="portfolio-item" style="animation-delay:${i * 60}ms" role="button" tabindex="0" aria-label="Open ${safeTitle}"><div class="portfolio-thumb">${thumbHtml}</div><div class="portfolio-info"><div class="portfolio-tags">${tagsHtml}</div><h3 class="portfolio-title">${title}</h3><p class="portfolio-desc">${desc}</p></div></article>`;
 }
 
 // Build a map: { "narrative": { "all": [cardHtml, ...], "documentary": [...], ... }, ... }

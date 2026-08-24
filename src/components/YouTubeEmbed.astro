@@ -269,14 +269,11 @@ const thumbUrl = videoId
     btn.replaceWith(iframe);
 
     // Mark the nearest portfolio card as "playing" so CSS can neutralize
-    // the data-tilt transform on it. The tilt JS keeps writing
-    // `transform: perspective(900px) rotateX(...) rotateY(...)` to
-    // .style on mousemove, which rotates the card and exposes the
-    // iframe's rectangular edges as a thin vertical line on the
-    // left/right while the user hovers a playing video. Once we mark
-    // the parent, the CSS rule `body:has([data-playing-embed]) [data-tilt]`
-    // (below) zeroes that transform via a high-specificity override.
-    // The showreel cards don't have data-tilt, so this is a no-op there.
+    // the data-tilt transform on any ancestor that still has it (Hero
+    // forms / Pipeline / Contact). Portfolio cards no longer carry
+    // data-tilt, so for those this is effectively a marker only — kept
+    // for consistency and so the playing-embed CSS hook still fires on
+    // elements that opt into tilt elsewhere.
     const card = btn.closest('[data-project-card], .video-card');
     if (card) {
       card.setAttribute('data-playing-embed', '');

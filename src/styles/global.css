@@ -1618,9 +1618,16 @@ a.badge-card:hover .badge-icon {
        curved outline and produced a thin vertical seam on the left/right
        when the card tilted on hover (data-tilt=8). Inheriting the radius
        makes the iframe pick up the same clip path as the thumbnail img. */
-    border-radius: inherit;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
+    /* Inherit the card's top corners. The card has border-radius: 1.25rem
+       and overflow: hidden, so the thumb's square corners were already being
+       clipped — but only by the card. The iframe that gets swapped in for
+       the .yt-embed button on click has its own hard pixel edges; without
+       this radius the iframe's top corners sit flush against the card's
+       curved outline and produce a thin vertical seam on the left/right.
+       Inheriting the radius makes the iframe pick up the same clip path as
+       the thumbnail img. (Originally added when portfolio cards had
+       data-tilt=8; the tilt is now off, but the radius still looks
+       consistent on the playing card, so it stays.) */
 }
 
 .portfolio-thumb img,
@@ -1734,15 +1741,18 @@ a.badge-card:hover .badge-icon {
         transform: none;
         filter: none;
     }
-    /* Once a portfolio card is playing a YouTube iframe, neutralize the
-       data-tilt transform on the card itself. main.js sets
-       `data-playing-embed` on the card right after the iframe swaps in;
-       the inline `transform: perspective(900px) rotateX(...) rotateY(...)`
-       style that the tilt loop writes on mousemove would otherwise rotate
+    /* Once a portfolio card is playing a YouTube iframe, neutralize any
+       tilt transform on the card itself. Portfolio cards no longer carry
+       data-tilt, but the rule still defends against ancestor tilt on
+       embedded layouts and protects showreel cards that opt back in.
+       main.js sets `data-playing-embed` on the card right after the
+       iframe swaps in; the inline `transform: perspective(...) rotateX/Y`
+       style the tilt loop writes on mousemove would otherwise rotate
        the card and reveal the iframe's rectangular edges as a vertical
        seam along the rounded outline. We override the inline transform
-       here; the JS also stops scheduling tilt frames for the playing card
-       so the inline style doesn't keep clobbering this rule. */
+       here with !important; the JS also stops scheduling tilt frames for
+       the playing card so the inline style doesn't keep clobbering this
+       rule. */
     [data-project-card][data-playing-embed],
     .video-card[data-playing-embed] {
         transform: none !important;
